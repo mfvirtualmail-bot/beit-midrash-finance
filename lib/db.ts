@@ -1,7 +1,19 @@
-import initSqlJs from 'sql.js'
-import type { Database as SqlJsDatabase } from 'sql.js'
 import path from 'path'
 import fs from 'fs'
+
+// Dynamic import for sql.js to avoid module format issues
+type SqlJsDatabase = {
+  run(sql: string, params?: unknown[]): void
+  exec(sql: string): { columns: string[]; values: unknown[][] }[]
+  prepare(sql: string): {
+    bind(params?: unknown[]): boolean
+    step(): boolean
+    getAsObject(): Record<string, unknown>
+    free(): void
+  }
+  export(): Uint8Array
+  close(): void
+}
 
 const DB_PATH = path.join(process.cwd(), 'data', 'finance.db')
 
@@ -20,6 +32,7 @@ function saveDb() {
 }
 
 async function initDatabase(): Promise<SqlJsDatabase> {
+  const initSqlJs = require('sql.js')
   const SQL = await initSqlJs()
   const dir = path.dirname(DB_PATH)
   if (!fs.existsSync(dir)) {
