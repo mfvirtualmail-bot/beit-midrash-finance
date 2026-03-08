@@ -25,9 +25,9 @@ export default function DashboardPage() {
       fetch(`/api/transactions?limit=10`).then(r => r.json()),
     ]).then(([rep, txns]) => {
       setSummary(rep.summary)
-      setRecent(txns)
+      setRecent(Array.isArray(txns) ? txns : [])
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [currentYear])
 
   const balance = (summary?.total_income ?? 0) - (summary?.total_expense ?? 0)
