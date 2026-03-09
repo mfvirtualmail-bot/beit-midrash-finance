@@ -7,7 +7,7 @@ import type { Transaction, Category } from '@/lib/db'
 const COLORS = ['#22c55e','#16a34a','#ef4444','#dc2626','#f97316','#a855f7','#f59e0b','#3b82f6','#6b7280','#14b8a6']
 
 const emptyForm = {
-  type: 'income' as 'income' | 'expense',
+  type: 'income' as 'income' | 'expense' | 'purchase',
   amount: '',
   description_he: '',
   description_en: '',
