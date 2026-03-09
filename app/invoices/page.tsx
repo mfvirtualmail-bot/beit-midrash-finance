@@ -118,12 +118,12 @@ export default function InvoicesPage() {
     if (!inv.member_email) return
     const subject = encodeURIComponent(`${inv.title_he} - ${inv.number || '#' + inv.id}`)
     const body = encodeURIComponent(
-      `שלום,\n\nמצורפת חשבונית מספר ${inv.number || inv.id}.\nסכום: ₪${(inv.total ?? 0).toLocaleString()}\n\nתודה`
+      `שלום,\n\nמצורפת חשבונית מספר ${inv.number || inv.id}.\nסכום: €${(inv.total ?? 0).toLocaleString()}\n\nתודה`
     )
     window.open(`mailto:${inv.member_email}?subject=${subject}&body=${body}`)
   }
 
-  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n)
+  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
   const statusLabel = (s: InvoiceStatus) => ({ draft: T.draft, sent: T.sent, paid: T.paid, cancelled: T.cancelled }[s] ?? s)
 
   return (
@@ -256,7 +256,7 @@ export default function InvoicesPage() {
                             <button
                               onClick={() => {
                                 const s = encodeURIComponent(`חשבונית - ${inv.member}`)
-                                const b = encodeURIComponent(`שלום,\n\nמצורפת חשבונית.\nסכום: ₪${inv.total.toLocaleString()}\n\nתודה`)
+                                const b = encodeURIComponent(`שלום,\n\nמצורפת חשבונית.\nסכום: €${inv.total.toLocaleString()}\n\nתודה`)
                                 window.open(`mailto:${inv.email}?subject=${s}&body=${b}`)
                               }}
                               className="p-1 text-green-600 hover:bg-green-50 rounded"

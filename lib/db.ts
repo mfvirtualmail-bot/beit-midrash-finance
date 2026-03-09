@@ -1,5 +1,5 @@
 // Type definitions for the database models
-export type TransactionType = 'income' | 'expense'
+export type TransactionType = 'income' | 'expense' | 'purchase'
 
 export interface Category {
   id: number
@@ -17,6 +17,7 @@ export interface Transaction {
   description_he: string | null
   description_en: string | null
   category_id: number | null
+  member_id: number | null
   date: string
   notes: string | null
   created_at: string

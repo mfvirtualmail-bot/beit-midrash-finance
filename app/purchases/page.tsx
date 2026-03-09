@@ -11,13 +11,12 @@ interface PurchaseRow {
   category_id: number | ''
   member_id: number | ''
   amount: string
-  description_he: string
   notes: string
 }
 
 function uuid() { return Math.random().toString(36).slice(2) }
 function newRow(): PurchaseRow {
-  return { id: uuid(), category_id: '', member_id: '', amount: '', description_he: '', notes: '' }
+  return { id: uuid(), category_id: '', member_id: '', amount: '', notes: '' }
 }
 
 function getHebrewWeekStart(date: Date): Date {
@@ -122,7 +121,7 @@ export default function PurchasesPage() {
   const [savedCount, setSavedCount] = useState<number | null>(null)
   // Purchase types management modal
   const [showTypesModal, setShowTypesModal] = useState(false)
-  const [typeForm, setTypeForm] = useState({ name_he: '', name_en: '', color: '#f97316' })
+  const [typeForm, setTypeForm] = useState({ name_he: '' })
   const [editingType, setEditingType] = useState<Category | null>(null)
   const [savingType, setSavingType] = useState(false)
   const [deleteTypeId, setDeleteTypeId] = useState<number | null>(null)
@@ -146,21 +145,31 @@ export default function PurchasesPage() {
   function addRow() { setRows(prev => [...prev, newRow()]) }
   function removeRow(id: string) { setRows(prev => prev.filter(r => r.id !== id)) }
 
+  const selectedWeek = weeks.find(w => w.dateStr === weekDate)
+  const shabbatLabel = selectedWeek?.shabbatLabel ?? ''
+
   async function handleSave() {
     const valid = rows.filter(r => r.category_id && r.amount && Number(r.amount) > 0)
     if (valid.length === 0) return
     setSaving(true)
-    const txns = valid.map(r => ({
-      type: 'expense',
-      amount: Number(r.amount),
-      description_he: r.description_he || (categories.find(c => c.id === r.category_id)?.name_he ?? ''),
-      description_en: null,
-      category_id: r.category_id || null,
-      date: weekDate,
-      notes: r.member_id
-        ? `${members.find(m => m.id === r.member_id)?.name ?? ''}${r.notes ? ' - ' + r.notes : ''}`
-        : r.notes || null,
-    }))
+    const txns = valid.map(r => {
+      const catName = purchaseCategories.find(c => c.id === r.category_id)?.name_he ?? ''
+      const descHe = shabbatLabel ? `${shabbatLabel} - ${catName}` : catName
+      const memberName = r.member_id ? (members.find(m => m.id === r.member_id)?.name ?? '') : ''
+      const notesStr = memberName
+        ? `${memberName}${r.notes ? ' - ' + r.notes : ''}`
+        : r.notes || null
+      return {
+        type: 'expense',
+        amount: Number(r.amount),
+        description_he: descHe,
+        description_en: null,
+        category_id: r.category_id || null,
+        member_id: r.member_id || null,
+        date: weekDate,
+        notes: notesStr,
+      }
+    })
     await Promise.all(txns.map(tx =>
       fetch('/api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tx) })
     ))
@@ -172,12 +181,12 @@ export default function PurchasesPage() {
 
   function openAddType() {
     setEditingType(null)
-    setTypeForm({ name_he: '', name_en: '', color: '#f97316' })
+    setTypeForm({ name_he: '' })
   }
 
   function openEditType(cat: Category) {
     setEditingType(cat)
-    setTypeForm({ name_he: cat.name_he, name_en: cat.name_en, color: cat.color })
+    setTypeForm({ name_he: cat.name_he })
   }
 
   async function handleSaveType(e: React.FormEvent) {
@@ -189,11 +198,11 @@ export default function PurchasesPage() {
     await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...typeForm, type: 'expense' }),
+      body: JSON.stringify({ name_he: typeForm.name_he, name_en: typeForm.name_he, type: 'purchase', color: '#6b7280' }),
     })
     setSavingType(false)
     setEditingType(null)
-    setTypeForm({ name_he: '', name_en: '', color: '#f97316' })
+    setTypeForm({ name_he: '' })
     loadCategories()
   }
 
@@ -203,11 +212,9 @@ export default function PurchasesPage() {
     loadCategories()
   }
 
-  const expenseCategories = categories.filter(c => c.type === 'expense')
+  const purchaseCategories = categories.filter(c => c.type === 'purchase')
   const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
-  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n)
-
-  const selectedWeek = weeks.find(w => w.dateStr === weekDate)
+  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
   return (
     <div className="space-y-6">
@@ -260,7 +267,7 @@ export default function PurchasesPage() {
                   {T.member}
                 </th>
                 <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[130px]">
-                  {T.amount} (₪)
+                  {T.amount} (€)
                 </th>
                 <th className="text-start py-2 px-2 font-semibold text-gray-600">
                   {T.notes}
@@ -276,7 +283,7 @@ export default function PurchasesPage() {
                       value={row.category_id}
                       onChange={e => updateRow(row.id, 'category_id', e.target.value ? Number(e.target.value) : '')}>
                       <option value="">{lang === 'he' ? '— בחר סוג —' : '— Select type —'}</option>
-                      {expenseCategories.map(c => (
+                      {purchaseCategories.map(c => (
                         <option key={c.id} value={c.id}>{c.name_he}</option>
                       ))}
                     </select>
@@ -342,7 +349,7 @@ export default function PurchasesPage() {
                 <Settings size={18} className="text-orange-500" />
                 {lang === 'he' ? 'ניהול סוגי רכישות' : 'Manage Purchase Types'}
               </h2>
-              <button onClick={() => { setShowTypesModal(false); setEditingType(null); setTypeForm({ name_he: '', name_en: '', color: '#f97316' }) }}
+              <button onClick={() => { setShowTypesModal(false); setEditingType(null); setTypeForm({ name_he: '' }) }}
                 className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">✕</button>
             </div>
 
@@ -352,46 +359,30 @@ export default function PurchasesPage() {
                 <div className="text-sm font-semibold text-orange-800">
                   {editingType ? (lang === 'he' ? 'ערוך סוג' : 'Edit Type') : (lang === 'he' ? 'הוסף סוג חדש' : 'Add New Type')}
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="label text-xs">{lang === 'he' ? 'שם (עברית) *' : 'Hebrew Name *'}</label>
-                    <input dir="rtl" className="input w-full text-sm" required
-                      value={typeForm.name_he} onChange={e => setTypeForm(f => ({ ...f, name_he: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="label text-xs">{lang === 'he' ? 'שם (אנגלית)' : 'English Name'}</label>
-                    <input dir="ltr" className="input w-full text-sm"
-                      value={typeForm.name_en} onChange={e => setTypeForm(f => ({ ...f, name_en: e.target.value }))} />
-                  </div>
+                <div>
+                  <label className="label text-xs">{lang === 'he' ? 'שם בעברית *' : 'Hebrew Name *'}</label>
+                  <input dir="rtl" className="input w-full text-sm" required
+                    value={typeForm.name_he} onChange={e => setTypeForm(f => ({ ...f, name_he: e.target.value }))} />
                 </div>
-                <div className="flex items-center gap-3">
-                  <div>
-                    <label className="label text-xs">{T.color}</label>
-                    <input type="color" className="h-9 w-12 rounded cursor-pointer border border-gray-200"
-                      value={typeForm.color} onChange={e => setTypeForm(f => ({ ...f, color: e.target.value }))} />
-                  </div>
-                  <div className="flex gap-2 flex-1 items-end">
-                    <button type="submit" disabled={savingType} className="btn-primary text-sm flex-1">
-                      {savingType ? T.loading : (editingType ? T.save : T.add)}
-                    </button>
-                    {editingType && (
-                      <button type="button" onClick={() => { setEditingType(null); setTypeForm({ name_he: '', name_en: '', color: '#f97316' }) }}
-                        className="btn-secondary text-sm px-3">{T.cancel}</button>
-                    )}
-                  </div>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={savingType} className="btn-primary text-sm flex-1">
+                    {savingType ? T.loading : (editingType ? T.save : T.add)}
+                  </button>
+                  {editingType && (
+                    <button type="button" onClick={() => { setEditingType(null); setTypeForm({ name_he: '' }) }}
+                      className="btn-secondary text-sm px-3">{T.cancel}</button>
+                  )}
                 </div>
               </form>
 
               {/* Types list */}
               <div className="space-y-1">
-                {expenseCategories.length === 0 && (
+                {purchaseCategories.length === 0 && (
                   <p className="text-center text-gray-400 py-4 text-sm">{lang === 'he' ? 'אין סוגי רכישות' : 'No purchase types'}</p>
                 )}
-                {expenseCategories.map(cat => (
+                {purchaseCategories.map(cat => (
                   <div key={cat.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 group">
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: cat.color }} />
                     <span className="font-medium text-gray-800 flex-1" dir="rtl">{cat.name_he}</span>
-                    {cat.name_en && <span className="text-gray-400 text-sm">{cat.name_en}</span>}
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openEditType(cat)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded">
                         <Edit2 size={13} />

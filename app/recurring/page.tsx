@@ -63,7 +63,7 @@ export default function RecurringPage() {
     load()
   }
 
-  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n)
+  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
   const freqLabel = (f: RecurringFrequency) => ({ weekly: T.weekly, monthly: T.monthly, yearly: T.yearly, hebrew_monthly: T.hebrewMonthly }[f] ?? f)
 
   const hebrewMonthOptions = Object.entries(MONTH_HE).map(([num, name]) => ({ value: Number(num), label: name }))

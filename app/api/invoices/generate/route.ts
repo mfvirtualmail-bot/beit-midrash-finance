@@ -29,13 +29,24 @@ export async function POST(req: NextRequest) {
     const yearHe = hebrewYearStr(hd)
     const periodLabel = `${monthHe} ${yearHe}`
 
+    const memberIds = members.map((m: { id: number }) => m.id)
+
     // Get all charges in range for these members
     const { data: allCharges } = await supabase
       .from('member_charges')
       .select('*')
       .gte('date', date_from)
       .lte('date', date_to)
-      .in('member_id', members.map((m: { id: number }) => m.id))
+      .in('member_id', memberIds)
+
+    // Get all purchases (transactions with member_id) in range
+    const { data: allPurchases } = await supabase
+      .from('transactions')
+      .select('*, categories(name_he)')
+      .eq('type', 'expense')
+      .gte('date', date_from)
+      .lte('date', date_to)
+      .in('member_id', memberIds)
 
     const createdInvoices = []
 
@@ -43,7 +54,11 @@ export async function POST(req: NextRequest) {
       const memberCharges = (allCharges ?? []).filter(
         (c: { member_id: number }) => c.member_id === member.id
       )
-      if (memberCharges.length === 0) continue
+      const memberPurchases = (allPurchases ?? []).filter(
+        (p: { member_id: number }) => p.member_id === member.id
+      )
+
+      if (memberCharges.length === 0 && memberPurchases.length === 0) continue
 
       const invoiceTitle = `חשבון - ${member.name} - ${periodLabel}`
       const { data: invoice, error: invError } = await supabase
@@ -62,7 +77,7 @@ export async function POST(req: NextRequest) {
 
       if (invError || !invoice) continue
 
-      const items = memberCharges.map((charge: { description: string; amount: number }) => ({
+      const chargeItems = memberCharges.map((charge: { description: string; amount: number }) => ({
         invoice_id: (invoice as { id: number }).id,
         description_he: charge.description,
         description_en: charge.description,
@@ -71,11 +86,21 @@ export async function POST(req: NextRequest) {
         amount: Number(charge.amount),
       }))
 
-      await supabase.from('invoice_items').insert(items)
+      const purchaseItems = memberPurchases.map((p: { description_he: string | null; amount: number; categories?: { name_he: string } | null }) => ({
+        invoice_id: (invoice as { id: number }).id,
+        description_he: p.description_he ?? (p.categories?.name_he ?? 'רכישה'),
+        description_en: p.description_he ?? 'Purchase',
+        quantity: 1,
+        unit_price: Number(p.amount),
+        amount: Number(p.amount),
+      }))
 
-      const total = memberCharges.reduce(
-        (s: number, c: { amount: number }) => s + Number(c.amount), 0
-      )
+      const allItems = [...chargeItems, ...purchaseItems]
+      if (allItems.length > 0) {
+        await supabase.from('invoice_items').insert(allItems)
+      }
+
+      const total = allItems.reduce((s: number, i: { amount: number }) => s + Number(i.amount), 0)
       createdInvoices.push({
         id: (invoice as { id: number }).id,
         member: member.name,

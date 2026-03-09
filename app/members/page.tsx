@@ -46,7 +46,7 @@ export default function MembersPage() {
   const [feeLoading, setFeeLoading] = useState(false)
   const [feeResult, setFeeResult] = useState<{ count: number; alreadyDone?: boolean } | null>(null)
 
-  const fmt = (n: number) => `₪${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -202,7 +202,7 @@ export default function MembersPage() {
                   <td className="px-4 py-3 text-end text-green-600">{fmt(m.total_payments)}</td>
                   <td className="px-4 py-3 text-end font-semibold">
                     <span className={m.balance < 0 ? 'text-red-600' : m.balance > 0 ? 'text-green-600' : 'text-gray-500'}>
-                      {m.balance < 0 ? `-${fmt(m.balance)}` : m.balance > 0 ? `+${fmt(m.balance)}` : '₪0.00'}
+                      {m.balance < 0 ? `-${fmt(m.balance)}` : m.balance > 0 ? `+${fmt(m.balance)}` : '€0.00'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -279,7 +279,7 @@ export default function MembersPage() {
                     <div className="text-center text-gray-400 py-4">{T.loading}</div>
                   )}
                   <div>
-                    <label className="label">{lang === 'he' ? 'סכום לחבר (₪)' : 'Amount per member (₪)'}</label>
+                    <label className="label">{lang === 'he' ? 'סכום לחבר (€)' : 'Amount per member (€)'}</label>
                     <input
                       type="number"
                       className="input w-full"

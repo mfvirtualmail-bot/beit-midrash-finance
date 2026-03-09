@@ -36,11 +36,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { type, amount, description_he, description_en, category_id, date, notes } = await req.json()
+    const { type, amount, description_he, description_en, category_id, date, notes, member_id } = await req.json()
     if (!type || !amount || !date) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     const { data } = await supabase.from('transactions')
       .insert({ type, amount, description_he: description_he||null, description_en: description_en||null,
-        category_id: category_id||null, date, notes: notes||null })
+        category_id: category_id||null, date, notes: notes||null, member_id: member_id||null })
       .select('*, categories(name_he, name_en, color)').single()
     return NextResponse.json(flattenTx(data as Record<string, unknown>), { status: 201 })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }

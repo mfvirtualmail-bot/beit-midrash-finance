@@ -9,7 +9,7 @@ create table if not exists categories (
   id bigint primary key generated always as identity,
   name_he text not null,
   name_en text not null,
-  type text not null check (type in ('income', 'expense')),
+  type text not null check (type in ('income', 'expense', 'purchase')),
   color text not null default '#6b7280',
   created_at timestamptz default now()
 );
@@ -183,3 +183,14 @@ alter table recurring_transactions disable row level security;
 -- If you see "permission denied" errors, also run:
 -- grant all on all tables in schema public to service_role;
 -- grant all on all sequences in schema public to service_role;
+
+-- ============================================================
+-- MIGRATIONS (run these if upgrading an existing installation)
+-- ============================================================
+
+-- v2: Add 'purchase' type for member purchase categories
+ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_type_check;
+ALTER TABLE categories ADD CONSTRAINT categories_type_check CHECK (type IN ('income', 'expense', 'purchase'));
+
+-- v2: Add member_id to transactions for purchase tracking
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS member_id bigint REFERENCES members(id) ON DELETE SET NULL;

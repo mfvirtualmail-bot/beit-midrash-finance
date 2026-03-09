@@ -48,7 +48,7 @@ export default function DonorDetailPage() {
     load()
   }
 
-  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n)
+  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
   if (loading) return <div className="text-center py-16 text-gray-400">{T.loading}</div>
   if (!donor) return <div className="text-center py-16 text-gray-400">{T.error}</div>

@@ -48,14 +48,14 @@ export default function InvoiceDetailPage() {
     })
   }, [params.id])
 
-  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 2 }).format(n)
+  const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n)
   const statusLabel = (s: string) => ({ draft: T.draft, sent: T.sent, paid: T.paid, cancelled: T.cancelled }[s] ?? s)
 
   function handleEmail() {
     if (!invoice?.member_email) return
     const subject = encodeURIComponent(`${invoice.title_he} - ${invoice.number || '#' + invoice.id}`)
     const body = encodeURIComponent(
-      `שלום,\n\nמצורפת חשבונית מספר ${invoice.number || invoice.id}.\nסכום: ₪${(invoice.total ?? 0).toLocaleString()}\n\nתודה,\n${settings?.org_name_he ?? 'בית המדרש'}`
+      `שלום,\n\nמצורפת חשבונית מספר ${invoice.number || invoice.id}.\nסכום: €${(invoice.total ?? 0).toLocaleString()}\n\nתודה,\n${settings?.org_name_he ?? 'בית המדרש'}`
     )
     window.open(`mailto:${invoice.member_email}?subject=${subject}&body=${body}`)
   }
