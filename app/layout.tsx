@@ -2,7 +2,7 @@
 import './globals.css'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User, Calendar } from 'lucide-react'
 import { LangProvider, useLang } from '@/lib/LangContext'
 import { useState, useEffect } from 'react'
 
@@ -39,6 +39,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: '/', label: T.dashboard, icon: LayoutDashboard },
     { href: '/transactions', label: T.transactions, icon: ArrowLeftRight },
+    { href: '/calendar', label: T.calendar, icon: Calendar },
     { href: '/purchases', label: lang === 'he' ? 'רכישות שבועיות' : 'Weekly Purchases', icon: ShoppingCart },
     { href: '/recurring', label: T.recurring, icon: RefreshCw },
     { href: '/members', label: T.members, icon: Users },
