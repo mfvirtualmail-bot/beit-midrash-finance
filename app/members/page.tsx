@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
 import Link from 'next/link'
 
@@ -18,6 +18,14 @@ interface Member {
   balance: number
 }
 
+interface FeePreview {
+  monthHe: string
+  yearHe: string
+  totalMembers: number
+  toCharge: number
+  alreadyCharged: number
+}
+
 const EMPTY = { name: '', phone: '', email: '', address: '', notes: '' }
 
 export default function MembersPage() {
@@ -31,8 +39,14 @@ export default function MembersPage() {
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  // Monthly fee state
+  const [showFeeModal, setShowFeeModal] = useState(false)
+  const [feePreview, setFeePreview] = useState<FeePreview | null>(null)
+  const [feeAmount, setFeeAmount] = useState('20')
+  const [feeLoading, setFeeLoading] = useState(false)
+  const [feeResult, setFeeResult] = useState<{ count: number; alreadyDone?: boolean } | null>(null)
 
-  const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const fmt = (n: number) => `₪${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,6 +57,27 @@ export default function MembersPage() {
   }, [search])
 
   useEffect(() => { load() }, [load])
+
+  async function openFeeModal() {
+    setFeeResult(null)
+    setShowFeeModal(true)
+    const res = await fetch('/api/members/monthly-fee')
+    const data = await res.json()
+    setFeePreview(data)
+  }
+
+  async function handleChargeFee() {
+    setFeeLoading(true)
+    const res = await fetch('/api/members/monthly-fee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: Number(feeAmount) }),
+    })
+    const data = await res.json()
+    setFeeResult(data)
+    setFeeLoading(false)
+    if (data.count > 0) load()
+  }
 
   function openAdd() {
     setEditing(null)
@@ -87,9 +122,16 @@ export default function MembersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-gray-800">{T.members}</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={openFeeModal}
+            className="flex items-center gap-2 text-sm px-3 py-2 bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 rounded-xl font-medium transition-colors"
+          >
+            <CalendarDays size={15} />
+            {lang === 'he' ? 'חייב דמי חבר' : 'Charge Monthly Fee'}
+          </button>
           <Link href="/members/import" className="btn-secondary flex items-center gap-2 text-sm">
             <Upload size={15} /> {lang === 'he' ? 'ייבוא' : 'Import'}
           </Link>
@@ -160,7 +202,7 @@ export default function MembersPage() {
                   <td className="px-4 py-3 text-end text-green-600">{fmt(m.total_payments)}</td>
                   <td className="px-4 py-3 text-end font-semibold">
                     <span className={m.balance < 0 ? 'text-red-600' : m.balance > 0 ? 'text-green-600' : 'text-gray-500'}>
-                      {m.balance < 0 ? `-${fmt(m.balance)}` : m.balance > 0 ? `+${fmt(m.balance)}` : '€0.00'}
+                      {m.balance < 0 ? `-${fmt(m.balance)}` : m.balance > 0 ? `+${fmt(m.balance)}` : '₪0.00'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -182,6 +224,87 @@ export default function MembersPage() {
           </table>
         )}
       </div>
+
+      {/* Monthly Fee Modal */}
+      {showFeeModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <CalendarDays size={20} className="text-amber-500" />
+                {lang === 'he' ? 'חיוב דמי חבר חודשיים' : 'Monthly Membership Fee'}
+              </h2>
+            </div>
+            <div className="p-6 space-y-4">
+              {feeResult ? (
+                <div className="text-center space-y-3">
+                  {feeResult.count === 0 && feeResult.alreadyDone ? (
+                    <div className="flex flex-col items-center gap-2 text-amber-600">
+                      <AlertCircle size={40} />
+                      <p className="font-medium">{lang === 'he' ? 'כל החברים כבר חויבו החודש' : 'All members already charged this month'}</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-green-600">
+                      <CheckCircle size={40} />
+                      <p className="font-medium">
+                        {feeResult.count} {lang === 'he' ? 'חברים חויבו בהצלחה' : 'members charged successfully'}
+                      </p>
+                    </div>
+                  )}
+                  <button onClick={() => setShowFeeModal(false)} className="btn-primary w-full mt-2">{T.cancel}</button>
+                </div>
+              ) : (
+                <>
+                  {feePreview ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 text-sm">
+                      <div className="font-semibold text-amber-800 text-base">
+                        {lang === 'he' ? `חודש: ${feePreview.monthHe} ${feePreview.yearHe}` : `Month: ${feePreview.monthHe} ${feePreview.yearHe}`}
+                      </div>
+                      <div className="flex justify-between text-gray-700">
+                        <span>{lang === 'he' ? 'חברים פעילים:' : 'Active members:'}</span>
+                        <span className="font-medium">{feePreview.totalMembers}</span>
+                      </div>
+                      <div className="flex justify-between text-green-700">
+                        <span>{lang === 'he' ? 'יחויבו:' : 'Will be charged:'}</span>
+                        <span className="font-semibold">{feePreview.toCharge}</span>
+                      </div>
+                      {feePreview.alreadyCharged > 0 && (
+                        <div className="flex justify-between text-gray-500">
+                          <span>{lang === 'he' ? 'כבר חויבו:' : 'Already charged:'}</span>
+                          <span>{feePreview.alreadyCharged}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-400 py-4">{T.loading}</div>
+                  )}
+                  <div>
+                    <label className="label">{lang === 'he' ? 'סכום לחבר (₪)' : 'Amount per member (₪)'}</label>
+                    <input
+                      type="number"
+                      className="input w-full"
+                      value={feeAmount}
+                      onChange={e => setFeeAmount(e.target.value)}
+                      min="1"
+                      step="1"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={handleChargeFee}
+                      disabled={feeLoading || !feePreview || feePreview.toCharge === 0}
+                      className="btn-primary flex-1 flex items-center justify-center gap-2"
+                    >
+                      {feeLoading ? T.loading : (lang === 'he' ? 'חייב עכשיו' : 'Charge Now')}
+                    </button>
+                    <button onClick={() => setShowFeeModal(false)} className="btn-secondary flex-1">{T.cancel}</button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showForm && (

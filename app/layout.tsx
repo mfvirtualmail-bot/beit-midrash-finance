@@ -2,7 +2,7 @@
 import './globals.css'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User } from 'lucide-react'
 import { LangProvider, useLang } from '@/lib/LangContext'
 import { useState, useEffect } from 'react'
 
@@ -12,6 +12,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { lang, setLang, T, isRTL } = useLang()
   const [menuOpen, setMenuOpen] = useState(false)
   const [user, setUser] = useState<AuthUser>(null)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -45,6 +46,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: '/invoices', label: T.invoices, icon: FileText },
     { href: '/categories', label: T.categories, icon: Tag },
     { href: '/reports', label: T.reports, icon: BarChart2 },
+    { href: '/settings', label: T.settings, icon: Settings },
   ]
 
   return (
@@ -57,12 +59,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 <span className="text-2xl">🕍</span>
                 <span className="font-bold text-lg">{T.appName}</span>
               </div>
-              <div className="flex items-center gap-3">
-                {user && (
-                  <span className="text-sm text-blue-100 hidden sm:block">
-                    {T.welcomeUser}, <span className="font-semibold text-white">{user.display_name.split('/')[0].trim()}</span>
-                  </span>
-                )}
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => setLang(lang === 'he' ? 'en' : 'he')}
                   className="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg transition-colors font-medium"
@@ -70,14 +67,34 @@ function Shell({ children }: { children: React.ReactNode }) {
                   {T.switchLang}
                 </button>
                 {user && (
-                  <button
-                    onClick={handleLogout}
-                    className="text-sm bg-blue-600 hover:bg-red-500 px-3 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1"
-                    title={T.logout}
-                  >
-                    <LogOut size={14} />
-                    <span className="hidden sm:inline">{T.logout}</span>
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setUserMenuOpen(o => !o)}
+                      className="flex items-center gap-1.5 text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg transition-colors font-medium"
+                    >
+                      <User size={15} />
+                      <span className="hidden sm:inline">{user.display_name.split('/')[0].trim()}</span>
+                    </button>
+                    {userMenuOpen && (
+                      <div
+                        className={`absolute ${isRTL ? 'left-0' : 'right-0'} top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 w-44 z-50`}
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <Link href="/profile" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl">
+                          <User size={14} /> {T.myProfile}
+                        </Link>
+                        <Link href="/settings" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                          <Settings size={14} /> {T.settings}
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-b-xl"
+                        >
+                          <LogOut size={14} /> {T.logout}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <button className="sm:hidden p-2 rounded hover:bg-blue-600" onClick={() => setMenuOpen(!menuOpen)}>
                   {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -111,7 +128,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
             {menuOpen && <div className="fixed inset-0 bg-black/30 z-30 sm:hidden" onClick={() => setMenuOpen(false)} />}
 
-            <main className="flex-1 p-4 sm:p-6 overflow-auto">
+            <main className="flex-1 p-4 sm:p-6 overflow-auto" onClick={() => userMenuOpen && setUserMenuOpen(false)}>
               <div className="max-w-6xl mx-auto">{children}</div>
             </main>
           </div>

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { Invoice, InvoiceStatus, Member, Donor } from '@/lib/db'
 import { formatHebrewDate } from '@/lib/hebrewDate'
-import { Plus, FileText, Pencil, Trash2, Eye, ChevronDown } from 'lucide-react'
+import { Plus, FileText, Pencil, Trash2, Eye, Mail, Zap, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_COLORS: Record<InvoiceStatus, string> = {
@@ -26,6 +26,14 @@ export default function InvoicesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Omit<Partial<Invoice>, 'items'> & { items?: Item[] }>({})
   const [saving, setSaving] = useState(false)
+  // Auto-generate state
+  const [showGenModal, setShowGenModal] = useState(false)
+  const [genDateFrom, setGenDateFrom] = useState(() => {
+    const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0]
+  })
+  const [genDateTo, setGenDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const [genLoading, setGenLoading] = useState(false)
+  const [genResult, setGenResult] = useState<{ count: number; invoices: { id: number; member: string; total: number; email: string | null }[] } | null>(null)
 
   async function load() {
     setLoading(true)
@@ -93,6 +101,28 @@ export default function InvoicesPage() {
     load()
   }
 
+  async function handleGenerate() {
+    setGenLoading(true)
+    const res = await fetch('/api/invoices/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date_from: genDateFrom, date_to: genDateTo }),
+    })
+    const data = await res.json()
+    setGenResult(data)
+    setGenLoading(false)
+    if (data.count > 0) load()
+  }
+
+  function sendEmailForInvoice(inv: Invoice) {
+    if (!inv.member_email) return
+    const subject = encodeURIComponent(`${inv.title_he} - ${inv.number || '#' + inv.id}`)
+    const body = encodeURIComponent(
+      `שלום,\n\nמצורפת חשבונית מספר ${inv.number || inv.id}.\nסכום: ₪${(inv.total ?? 0).toLocaleString()}\n\nתודה`
+    )
+    window.open(`mailto:${inv.member_email}?subject=${subject}&body=${body}`)
+  }
+
   const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n)
   const statusLabel = (s: InvoiceStatus) => ({ draft: T.draft, sent: T.sent, paid: T.paid, cancelled: T.cancelled }[s] ?? s)
 
@@ -102,9 +132,18 @@ export default function InvoicesPage() {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <FileText size={24} className="text-blue-600" /> {T.invoices}
         </h1>
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> {T.addInvoice}
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => { setGenResult(null); setShowGenModal(true) }}
+            className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 border border-purple-300 text-purple-800 hover:bg-purple-100 rounded-xl font-medium transition-colors"
+          >
+            <Zap size={15} />
+            {lang === 'he' ? 'הפק לכל החברים' : 'Generate for All'}
+          </button>
+          <button onClick={openAdd} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> {T.addInvoice}
+          </button>
+        </div>
       </div>
 
       <div className="card">
@@ -157,6 +196,19 @@ export default function InvoicesPage() {
                         <Link href={`/invoices/${inv.id}`} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title={T.printInvoice}>
                           <Eye size={14} />
                         </Link>
+                        {inv.member_email ? (
+                          <button
+                            onClick={() => sendEmailForInvoice(inv)}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg"
+                            title={T.sendEmail}
+                          >
+                            <Mail size={14} />
+                          </button>
+                        ) : (
+                          <span className="p-1.5 text-gray-300" title={T.noEmail}>
+                            <Mail size={14} />
+                          </span>
+                        )}
                         <button onClick={() => openEdit(inv)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg">
                           <Pencil size={14} />
                         </button>
@@ -173,6 +225,90 @@ export default function InvoicesPage() {
         )}
       </div>
 
+      {/* Auto-Generate Modal */}
+      {showGenModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Zap size={20} className="text-purple-500" />
+              {lang === 'he' ? 'הפקת חשבוניות לכל החברים' : 'Generate Invoices for All Members'}
+            </h2>
+
+            {genResult ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-green-700 font-semibold">
+                  <CheckCircle size={20} />
+                  {genResult.count} {lang === 'he' ? 'חשבוניות הופקו' : 'invoices generated'}
+                </div>
+                {genResult.invoices.length > 0 && (
+                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                    {genResult.invoices.map(inv => (
+                      <div key={inv.id} className="px-4 py-2 flex items-center justify-between text-sm">
+                        <div>
+                          <span className="font-medium">{inv.member}</span>
+                          <span className="text-gray-500 ms-2">{fmt(inv.total)}</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <Link href={`/invoices/${inv.id}`} target="_blank" className="p-1 text-blue-600 hover:bg-blue-50 rounded">
+                            <Eye size={13} />
+                          </Link>
+                          {inv.email && (
+                            <button
+                              onClick={() => {
+                                const s = encodeURIComponent(`חשבונית - ${inv.member}`)
+                                const b = encodeURIComponent(`שלום,\n\nמצורפת חשבונית.\nסכום: ₪${inv.total.toLocaleString()}\n\nתודה`)
+                                window.open(`mailto:${inv.email}?subject=${s}&body=${b}`)
+                              }}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                            >
+                              <Mail size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {genResult.count === 0 && (
+                  <p className="text-gray-500 text-sm">{lang === 'he' ? 'לא נמצאו חיובים לתקופה זו.' : 'No charges found for this period.'}</p>
+                )}
+                <button onClick={() => setShowGenModal(false)} className="btn-secondary w-full">{T.cancel}</button>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-gray-600">
+                  {lang === 'he'
+                    ? 'בחר תקופה. המערכת תיצור חשבונית לכל חבר שיש לו חיובים בתקופה זו.'
+                    : 'Select a date range. An invoice will be created for each member with charges in that period.'}
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">{lang === 'he' ? 'מתאריך' : 'From Date'}</label>
+                    <input type="date" className="input w-full" value={genDateFrom} onChange={e => setGenDateFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">{lang === 'he' ? 'עד תאריך' : 'To Date'}</label>
+                    <input type="date" className="input w-full" value={genDateTo} onChange={e => setGenDateTo(e.target.value)} />
+                  </div>
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button className="btn-secondary" onClick={() => setShowGenModal(false)}>{T.cancel}</button>
+                  <button
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2"
+                    onClick={handleGenerate}
+                    disabled={genLoading}
+                  >
+                    <Zap size={16} />
+                    {genLoading ? T.loading : (lang === 'he' ? 'הפק חשבוניות' : 'Generate Invoices')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>

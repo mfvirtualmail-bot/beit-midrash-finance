@@ -153,6 +153,15 @@ create table if not exists recurring_transactions (
   created_at timestamptz default now()
 );
 
+-- Organization settings (key-value store for invoice header/footer, org details, etc.)
+create table if not exists settings (
+  key text primary key,
+  value text,
+  updated_at timestamptz default now()
+);
+
+alter table settings disable row level security;
+
 -- ============================================================
 -- INDEXES for performance
 -- ============================================================

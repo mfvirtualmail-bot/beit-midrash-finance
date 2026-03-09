@@ -3,8 +3,8 @@ import { useEffect, useState, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { Category, Member } from '@/lib/db'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE } from '@/lib/hebrewDate'
-import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown } from 'lucide-react'
+import { MONTH_HE, getShabbatOrHolidayLabel } from '@/lib/hebrewDate'
+import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, Settings, Edit2 } from 'lucide-react'
 
 interface PurchaseRow {
   id: string
@@ -16,21 +16,18 @@ interface PurchaseRow {
 }
 
 function uuid() { return Math.random().toString(36).slice(2) }
-
 function newRow(): PurchaseRow {
   return { id: uuid(), category_id: '', member_id: '', amount: '', description_he: '', notes: '' }
 }
 
-// Get the Sunday of the Hebrew week containing the given date
 function getHebrewWeekStart(date: Date): Date {
-  const dow = date.getDay() // 0=Sunday
+  const dow = date.getDay()
   const sunday = new Date(date)
   sunday.setDate(date.getDate() - dow)
   return sunday
 }
 
-// Generate list of recent Sundays (12 weeks back)
-function getRecentWeeks(): Array<{ label: string; dateStr: string }> {
+function getRecentWeeks(): Array<{ label: string; dateStr: string; shabbatLabel: string }> {
   const weeks = []
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -39,7 +36,6 @@ function getRecentWeeks(): Array<{ label: string; dateStr: string }> {
     sunday.setDate(sunday.getDate() - i * 7)
     const saturday = new Date(sunday)
     saturday.setDate(sunday.getDate() + 6)
-    // Hebrew dates for Sunday and Saturday
     const hdSun = new HDate(sunday)
     const hdSat = new HDate(saturday)
     const hebrewSunDay = hdSun.getDate()
@@ -51,15 +47,17 @@ function getRecentWeeks(): Array<{ label: string; dateStr: string }> {
       ? `${hebrewSunDay}–${hebrewSatDay} ${hebrewSunMonth}`
       : `${hebrewSunDay} ${hebrewSunMonth} – ${hebrewSatDay} ${hebrewSatMonth}`
     const greg = `${sunday.toLocaleDateString('en-GB')} – ${saturday.toLocaleDateString('en-GB')}`
+    const sundayStr = sunday.toISOString().split('T')[0]
+    const shabbatLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
     weeks.push({
-      label: `${hebrewLabel}  (${greg})`,
-      dateStr: sunday.toISOString().split('T')[0],
+      label: `${shabbatLabel ? shabbatLabel + ' | ' : ''}${hebrewLabel}  (${greg})`,
+      dateStr: sundayStr,
+      shabbatLabel,
     })
   }
   return weeks
 }
 
-// Searchable member selector
 function MemberSelect({ members, value, onChange, placeholder }: {
   members: Member[]
   value: number | ''
@@ -70,10 +68,7 @@ function MemberSelect({ members, value, onChange, placeholder }: {
   const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
   const selected = members.find(m => m.id === value)
-
-  const filtered = members.filter(m =>
-    !search || m.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = members.filter(m => !search || m.name.toLowerCase().includes(search.toLowerCase()))
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -125,6 +120,18 @@ export default function PurchasesPage() {
   const [rows, setRows] = useState<PurchaseRow[]>([newRow(), newRow(), newRow()])
   const [saving, setSaving] = useState(false)
   const [savedCount, setSavedCount] = useState<number | null>(null)
+  // Purchase types management modal
+  const [showTypesModal, setShowTypesModal] = useState(false)
+  const [typeForm, setTypeForm] = useState({ name_he: '', name_en: '', color: '#f97316' })
+  const [editingType, setEditingType] = useState<Category | null>(null)
+  const [savingType, setSavingType] = useState(false)
+  const [deleteTypeId, setDeleteTypeId] = useState<number | null>(null)
+
+  async function loadCategories() {
+    const res = await fetch('/api/categories')
+    const data = await res.json()
+    setCategories(Array.isArray(data) ? data : [])
+  }
 
   useEffect(() => {
     Promise.all([fetch('/api/categories'), fetch('/api/members')]).then(async ([c, m]) => {
@@ -136,7 +143,6 @@ export default function PurchasesPage() {
   function updateRow(id: string, field: keyof PurchaseRow, value: string | number | '') {
     setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
   }
-
   function addRow() { setRows(prev => [...prev, newRow()]) }
   function removeRow(id: string) { setRows(prev => prev.filter(r => r.id !== id)) }
 
@@ -155,8 +161,6 @@ export default function PurchasesPage() {
         ? `${members.find(m => m.id === r.member_id)?.name ?? ''}${r.notes ? ' - ' + r.notes : ''}`
         : r.notes || null,
     }))
-
-    // Bulk insert by posting each one (could be batched but keep simple)
     await Promise.all(txns.map(tx =>
       fetch('/api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tx) })
     ))
@@ -166,9 +170,44 @@ export default function PurchasesPage() {
     setTimeout(() => setSavedCount(null), 4000)
   }
 
+  function openAddType() {
+    setEditingType(null)
+    setTypeForm({ name_he: '', name_en: '', color: '#f97316' })
+  }
+
+  function openEditType(cat: Category) {
+    setEditingType(cat)
+    setTypeForm({ name_he: cat.name_he, name_en: cat.name_en, color: cat.color })
+  }
+
+  async function handleSaveType(e: React.FormEvent) {
+    e.preventDefault()
+    if (!typeForm.name_he.trim()) return
+    setSavingType(true)
+    const url = editingType ? `/api/categories/${editingType.id}` : '/api/categories'
+    const method = editingType ? 'PUT' : 'POST'
+    await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...typeForm, type: 'expense' }),
+    })
+    setSavingType(false)
+    setEditingType(null)
+    setTypeForm({ name_he: '', name_en: '', color: '#f97316' })
+    loadCategories()
+  }
+
+  async function handleDeleteType(id: number) {
+    await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+    setDeleteTypeId(null)
+    loadCategories()
+  }
+
   const expenseCategories = categories.filter(c => c.type === 'expense')
   const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
   const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n)
+
+  const selectedWeek = weeks.find(w => w.dateStr === weekDate)
 
   return (
     <div className="space-y-6">
@@ -177,6 +216,13 @@ export default function PurchasesPage() {
           <ShoppingCart size={24} className="text-orange-500" />
           {lang === 'he' ? 'הזנת רכישות שבועיות' : 'Weekly Purchases Entry'}
         </h1>
+        <button
+          onClick={() => setShowTypesModal(true)}
+          className="flex items-center gap-2 text-sm px-3 py-2 bg-orange-50 border border-orange-300 text-orange-800 hover:bg-orange-100 rounded-xl font-medium transition-colors"
+        >
+          <Settings size={15} />
+          {lang === 'he' ? 'נהל סוגי רכישות' : 'Manage Purchase Types'}
+        </button>
       </div>
 
       {savedCount !== null && (
@@ -189,13 +235,18 @@ export default function PurchasesPage() {
       <div className="card">
         <div className="mb-6">
           <label className="label text-base font-semibold">
-            {lang === 'he' ? 'בחר שבוע עברי' : 'Select Hebrew Week'}
+            {lang === 'he' ? 'בחר שבוע / חג' : 'Select Week / Holiday'}
           </label>
-          <select className="input w-full max-w-md text-sm" dir="rtl" value={weekDate} onChange={e => setWeekDate(e.target.value)}>
+          <select className="input w-full max-w-xl text-sm" dir="rtl" value={weekDate} onChange={e => setWeekDate(e.target.value)}>
             {weeks.map(w => (
               <option key={w.dateStr} value={w.dateStr}>{w.label}</option>
             ))}
           </select>
+          {selectedWeek?.shabbatLabel && (
+            <div className="mt-2 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm font-medium" dir="rtl">
+              ✡ {selectedWeek.shabbatLabel}
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -281,6 +332,94 @@ export default function PurchasesPage() {
           </div>
         </div>
       </div>
+
+      {/* Purchase Types Management Modal */}
+      {showTypesModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Settings size={18} className="text-orange-500" />
+                {lang === 'he' ? 'ניהול סוגי רכישות' : 'Manage Purchase Types'}
+              </h2>
+              <button onClick={() => { setShowTypesModal(false); setEditingType(null); setTypeForm({ name_he: '', name_en: '', color: '#f97316' }) }}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Add / Edit form */}
+              <form onSubmit={handleSaveType} className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+                <div className="text-sm font-semibold text-orange-800">
+                  {editingType ? (lang === 'he' ? 'ערוך סוג' : 'Edit Type') : (lang === 'he' ? 'הוסף סוג חדש' : 'Add New Type')}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="label text-xs">{lang === 'he' ? 'שם (עברית) *' : 'Hebrew Name *'}</label>
+                    <input dir="rtl" className="input w-full text-sm" required
+                      value={typeForm.name_he} onChange={e => setTypeForm(f => ({ ...f, name_he: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="label text-xs">{lang === 'he' ? 'שם (אנגלית)' : 'English Name'}</label>
+                    <input dir="ltr" className="input w-full text-sm"
+                      value={typeForm.name_en} onChange={e => setTypeForm(f => ({ ...f, name_en: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <label className="label text-xs">{T.color}</label>
+                    <input type="color" className="h-9 w-12 rounded cursor-pointer border border-gray-200"
+                      value={typeForm.color} onChange={e => setTypeForm(f => ({ ...f, color: e.target.value }))} />
+                  </div>
+                  <div className="flex gap-2 flex-1 items-end">
+                    <button type="submit" disabled={savingType} className="btn-primary text-sm flex-1">
+                      {savingType ? T.loading : (editingType ? T.save : T.add)}
+                    </button>
+                    {editingType && (
+                      <button type="button" onClick={() => { setEditingType(null); setTypeForm({ name_he: '', name_en: '', color: '#f97316' }) }}
+                        className="btn-secondary text-sm px-3">{T.cancel}</button>
+                    )}
+                  </div>
+                </div>
+              </form>
+
+              {/* Types list */}
+              <div className="space-y-1">
+                {expenseCategories.length === 0 && (
+                  <p className="text-center text-gray-400 py-4 text-sm">{lang === 'he' ? 'אין סוגי רכישות' : 'No purchase types'}</p>
+                )}
+                {expenseCategories.map(cat => (
+                  <div key={cat.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 group">
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: cat.color }} />
+                    <span className="font-medium text-gray-800 flex-1" dir="rtl">{cat.name_he}</span>
+                    {cat.name_en && <span className="text-gray-400 text-sm">{cat.name_en}</span>}
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openEditType(cat)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded">
+                        <Edit2 size={13} />
+                      </button>
+                      <button onClick={() => setDeleteTypeId(cat.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete type confirm */}
+      {deleteTypeId !== null && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center space-y-4">
+            <p className="font-medium text-gray-800">{T.confirmDelete}</p>
+            <div className="flex gap-2">
+              <button onClick={() => handleDeleteType(deleteTypeId)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex-1">{T.delete}</button>
+              <button onClick={() => setDeleteTypeId(null)} className="btn-secondary flex-1">{T.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

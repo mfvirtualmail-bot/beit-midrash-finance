@@ -1,4 +1,4 @@
-import { HDate, months, HebrewCalendar, CalOptions } from '@hebcal/core'
+import { HDate, months, HebrewCalendar, CalOptions, flags } from '@hebcal/core'
 
 export const HEBREW_MONTHS_HE = [
   'תשרי', 'חשוון', 'כסלו', 'טבת', 'שבט', 'אדר', 'אדר א׳', 'אדר ב׳',
@@ -116,6 +116,53 @@ export function hebrewMonthToGregorianRange(hebrewMonth: number, hebrewYear: num
   const endG = end.greg()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
   return { start: fmt(startG), end: fmt(endG) }
+}
+
+// Get the Hebrew year as gematria string (e.g. "תשפ״ה")
+export function hebrewYearStr(hd: HDate): string {
+  try {
+    if (typeof (hd as HDate & { renderGematriya?: () => string }).renderGematriya === 'function') {
+      const parts = (hd as HDate & { renderGematriya: () => string }).renderGematriya().split(' ')
+      return parts[parts.length - 1]
+    }
+  } catch {}
+  return String(hd.getFullYear())
+}
+
+// Get Shabbat parasha name or Holiday name for the week containing sundayDateStr
+export function getShabbatOrHolidayLabel(sundayDateStr: string, lang: 'he' | 'en' = 'he'): string {
+  try {
+    const [y, m, d] = sundayDateStr.split('-').map(Number)
+    const saturday = new Date(y, m - 1, d + 6)
+
+    const events = HebrewCalendar.calendar({
+      start: saturday,
+      end: saturday,
+      sedrot: true,
+      il: true,
+      noHolidays: false,
+    } as CalOptions)
+
+    // Yom Tov takes priority
+    const chag = events.find(e => e.getFlags() & flags.CHAG)
+    if (chag) return lang === 'he' ? (chag.renderBrief?.('he') ?? chag.render('he')) : (chag.renderBrief?.('en') ?? chag.render('en'))
+
+    // Special Shabbat (HaGadol, Shuva, etc.)
+    const special = events.find(e => e.getFlags() & flags.SPECIAL_SHABBAT)
+    const parasha = events.find(e => e.getFlags() & flags.PARSHA_HASHAVUA)
+
+    if (parasha && special) {
+      const pName = parasha.render?.(lang === 'he' ? 'he' : 'en') ?? ''
+      const sName = special.render?.(lang === 'he' ? 'he' : 'en') ?? ''
+      return `${pName} (${sName})`
+    }
+    if (parasha) return parasha.render?.(lang === 'he' ? 'he' : 'en') ?? (lang === 'he' ? 'שבת' : 'Shabbat')
+    if (special) return special.render?.(lang === 'he' ? 'he' : 'en') ?? (lang === 'he' ? 'שבת' : 'Shabbat')
+
+    return lang === 'he' ? 'שבת' : 'Shabbat'
+  } catch {
+    return lang === 'he' ? 'שבת' : 'Shabbat'
+  }
 }
 
 export { MONTH_HE, MONTH_EN, MONTH_ORDER }

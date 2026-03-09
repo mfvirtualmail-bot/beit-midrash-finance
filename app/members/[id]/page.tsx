@@ -35,7 +35,7 @@ export default function MemberDetailPage() {
   const [payment, setPayment] = useState({ amount: '', date: TODAY, method: 'cash', reference: '', notes: '' })
   const [savingPayment, setSavingPayment] = useState(false)
 
-  const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const fmt = (n: number) => `₪${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -216,7 +216,7 @@ export default function MemberDetailPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">{T.amount} (€) *</label>
+                  <label className="label">{T.amount} (₪) *</label>
                   <input className="input w-full" type="number" step="0.01" min="0.01" value={charge.amount} onChange={e => setCharge(c => ({ ...c, amount: e.target.value }))} required />
                 </div>
                 <div>
@@ -245,7 +245,7 @@ export default function MemberDetailPage() {
             <form onSubmit={addPayment} className="p-5 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">{T.amount} (€) *</label>
+                  <label className="label">{T.amount} (₪) *</label>
                   <input className="input w-full" type="number" step="0.01" min="0.01" value={payment.amount} onChange={e => setPayment(p => ({ ...p, amount: e.target.value }))} required />
                 </div>
                 <div>

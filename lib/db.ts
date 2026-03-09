@@ -103,6 +103,7 @@ export interface Invoice {
   created_by: number | null
   items?: InvoiceItem[]
   member_name?: string
+  member_email?: string | null
   donor_name_he?: string
   total?: number
 }

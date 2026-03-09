@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
     let q = supabase.from('invoices')
-      .select('*, members(name), donors(name_he)')
+      .select('*, members(name, email), donors(name_he)')
       .order('date', { ascending: false })
     if (status) q = q.eq('status', status)
     const { data } = await q
@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
     }
     const result = (data ?? []).map((inv: Record<string, unknown>) => ({
       ...inv,
-      member_name: (inv.members as { name: string } | null)?.name ?? null,
+      member_name: (inv.members as { name: string; email: string } | null)?.name ?? null,
+      member_email: (inv.members as { name: string; email: string } | null)?.email ?? null,
       donor_name_he: (inv.donors as { name_he: string } | null)?.name_he ?? null,
       members: undefined,
       donors: undefined,

@@ -105,7 +105,7 @@ export default function ReportsPage() {
           <BarChart data={monthlyFull} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={v => `€${(v/1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
+            <YAxis tickFormatter={v => `₪${(v/1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
             <Tooltip formatter={(v: unknown) => fmt(Number(v))} />
             <Legend />
             <Bar dataKey="income" name={T.income} fill="#22c55e" radius={[4,4,0,0]} />
