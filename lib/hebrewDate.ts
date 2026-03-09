@@ -13,7 +13,7 @@ export const HEBREW_MONTHS_EN = [
 // Month numbers (Hebcal uses these constants)
 const MONTH_ORDER = [
   months.TISHREI, months.CHESHVAN, months.KISLEV, months.TEVET,
-  months.SHEVAT, months.ADAR_I, months.ADAR_II,
+  months.SHVAT, months.ADAR_I, months.ADAR_II,
   months.NISAN, months.IYYAR, months.SIVAN, months.TAMUZ,
   months.AV, months.ELUL,
 ]
@@ -23,7 +23,7 @@ const MONTH_HE: Record<number, string> = {
   [months.CHESHVAN]: 'חשוון',
   [months.KISLEV]: 'כסלו',
   [months.TEVET]: 'טבת',
-  [months.SHEVAT]: 'שבט',
+  [months.SHVAT]: 'שבט',
   [months.ADAR_I]: 'אדר א׳',
   [months.ADAR_II]: 'אדר ב׳',
   [months.NISAN]: 'ניסן',
@@ -39,7 +39,7 @@ const MONTH_EN: Record<number, string> = {
   [months.CHESHVAN]: 'Cheshvan',
   [months.KISLEV]: 'Kislev',
   [months.TEVET]: 'Tevet',
-  [months.SHEVAT]: 'Shevat',
+  [months.SHVAT]: 'Shevat',
   [months.ADAR_I]: 'Adar I',
   [months.ADAR_II]: 'Adar II',
   [months.NISAN]: 'Nisan',
