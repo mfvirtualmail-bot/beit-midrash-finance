@@ -70,3 +70,74 @@ export interface MemberPayment {
   created_at: string
   created_by_name?: string
 }
+
+// Donors
+export interface Donor {
+  id: number
+  name_he: string
+  name_en: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  notes: string | null
+  active: boolean
+  created_at: string
+  total_donated?: number
+}
+
+// Invoices
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'cancelled'
+
+export interface Invoice {
+  id: number
+  number: string
+  date: string
+  due_date: string | null
+  member_id: number | null
+  donor_id: number | null
+  title_he: string
+  title_en: string | null
+  status: InvoiceStatus
+  notes: string | null
+  created_at: string
+  created_by: number | null
+  items?: InvoiceItem[]
+  member_name?: string
+  donor_name_he?: string
+  total?: number
+}
+
+export interface InvoiceItem {
+  id: number
+  invoice_id: number
+  description_he: string
+  description_en: string | null
+  quantity: number
+  unit_price: number
+  amount: number
+}
+
+// Recurring Transactions
+export type RecurringFrequency = 'weekly' | 'monthly' | 'yearly' | 'hebrew_monthly'
+
+export interface RecurringTransaction {
+  id: number
+  name_he: string
+  name_en: string | null
+  type: TransactionType
+  amount: number
+  category_id: number | null
+  frequency: RecurringFrequency
+  day_of_month: number | null       // 1-31 for monthly/yearly
+  hebrew_day: number | null          // 1-30 for hebrew_monthly
+  hebrew_month: number | null        // Hebcal month number for yearly
+  start_date: string
+  end_date: string | null
+  last_generated: string | null
+  active: boolean
+  notes: string | null
+  created_at: string
+  category_name_he?: string
+  category_name_en?: string
+  category_color?: string
+}

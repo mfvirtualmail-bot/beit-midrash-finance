@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
+import Link from 'next/link'
 
 interface Member {
   id: number
@@ -20,7 +21,7 @@ interface Member {
 const EMPTY = { name: '', phone: '', email: '', address: '', notes: '' }
 
 export default function MembersPage() {
-  const { T } = useLang()
+  const { T, lang } = useLang()
   const router = useRouter()
   const [members, setMembers] = useState<Member[]>([])
   const [search, setSearch] = useState('')
@@ -88,9 +89,14 @@ export default function MembersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">{T.members}</h1>
-        <button onClick={openAdd} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> {T.addMember}
-        </button>
+        <div className="flex gap-2">
+          <Link href="/members/import" className="btn-secondary flex items-center gap-2 text-sm">
+            <Upload size={15} /> {lang === 'he' ? 'ייבוא' : 'Import'}
+          </Link>
+          <button onClick={openAdd} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> {T.addMember}
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
