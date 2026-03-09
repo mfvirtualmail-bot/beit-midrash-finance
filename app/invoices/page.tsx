@@ -24,7 +24,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState<Partial<Invoice> & { items?: Item[] }>({})
+  const [editing, setEditing] = useState<Omit<Partial<Invoice>, 'items'> & { items?: Item[] }>({})
   const [saving, setSaving] = useState(false)
 
   async function load() {
