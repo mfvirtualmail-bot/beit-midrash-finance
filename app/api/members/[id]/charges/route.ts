@@ -1,25 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, queryOne, runSql } from '@/lib/db'
+import { supabase, getSessionUser } from '@/lib/supabase'
 import { COOKIE_NAME } from '@/lib/auth'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const db = await getDb()
-    const token = req.cookies.get(COOKIE_NAME)?.value
-    const session = token ? queryOne(db, `SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime('now')`, [token]) : null
-    const userId = session ? (session.user_id as number) : null
-
+    const userId = await getSessionUser(req.cookies.get(COOKIE_NAME)?.value)
     const { description, amount, date, notes } = await req.json()
-    if (!description?.trim() || !amount || !date) {
-      return NextResponse.json({ error: 'description, amount, date required' }, { status: 400 })
-    }
-
-    const { lastId } = runSql(db,
-      `INSERT INTO member_charges (member_id, description, amount, date, notes, created_by) VALUES (?, ?, ?, ?, ?, ?)`,
-      [Number(params.id), description.trim(), Number(amount), date, notes || null, userId]
-    )
-    return NextResponse.json(queryOne(db, `SELECT * FROM member_charges WHERE id = ?`, [lastId]), { status: 201 })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    if (!description?.trim() || !amount || !date) return NextResponse.json({ error: 'description, amount, date required' }, { status: 400 })
+    const { data } = await supabase.from('member_charges')
+      .insert({ member_id: Number(params.id), description: description.trim(), amount: Number(amount), date, notes: notes||null, created_by: userId })
+      .select().single()
+    return NextResponse.json(data, { status: 201 })
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }

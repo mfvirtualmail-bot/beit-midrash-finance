@@ -1,55 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, queryOne, queryAll, runSql } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const db = await getDb()
-    const member = queryOne(db, `
-      SELECT m.*,
-        COALESCE((SELECT SUM(amount) FROM member_charges WHERE member_id = m.id), 0) as total_charges,
-        COALESCE((SELECT SUM(amount) FROM member_payments WHERE member_id = m.id), 0) as total_payments,
-        COALESCE((SELECT SUM(amount) FROM member_payments WHERE member_id = m.id), 0) -
-        COALESCE((SELECT SUM(amount) FROM member_charges WHERE member_id = m.id), 0) as balance
-      FROM members m WHERE m.id = ?`, [Number(params.id)])
+    const { data: member } = await supabase.from('members').select('*').eq('id', params.id).single()
     if (!member) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const charges = queryAll(db, `
-      SELECT mc.*, u.display_name as created_by_name
-      FROM member_charges mc LEFT JOIN users u ON mc.created_by = u.id
-      WHERE mc.member_id = ? ORDER BY mc.date DESC`, [Number(params.id)])
+    const { data: charges } = await supabase.from('member_charges')
+      .select('*, users:created_by(display_name)').eq('member_id', params.id).order('date', { ascending: false })
+    const { data: payments } = await supabase.from('member_payments')
+      .select('*, users:created_by(display_name)').eq('member_id', params.id).order('date', { ascending: false })
 
-    const payments = queryAll(db, `
-      SELECT mp.*, u.display_name as created_by_name
-      FROM member_payments mp LEFT JOIN users u ON mp.created_by = u.id
-      WHERE mp.member_id = ? ORDER BY mp.date DESC`, [Number(params.id)])
+    const tc = (charges ?? []).reduce((s, c) => s + Number(c.amount), 0)
+    const tp = (payments ?? []).reduce((s, p) => s + Number(p.amount), 0)
 
-    return NextResponse.json({ member, charges, payments })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    const flatCharges = (charges ?? []).map(c => ({ ...c, created_by_name: (c.users as {display_name:string}|null)?.display_name ?? null, users: undefined }))
+    const flatPayments = (payments ?? []).map(p => ({ ...p, created_by_name: (p.users as {display_name:string}|null)?.display_name ?? null, users: undefined }))
+
+    return NextResponse.json({
+      member: { ...member, total_charges: tc, total_payments: tp, balance: tp - tc },
+      charges: flatCharges, payments: flatPayments,
+    })
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const db = await getDb()
     const { name, phone, email, address, notes } = await req.json()
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 })
-
-    runSql(db, `UPDATE members SET name=?, phone=?, email=?, address=?, notes=? WHERE id=?`,
-      [name.trim(), phone || null, email || null, address || null, notes || null, Number(params.id)])
-    const member = queryOne(db, `SELECT * FROM members WHERE id = ?`, [Number(params.id)])
-    return NextResponse.json(member)
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    const { data } = await supabase.from('members')
+      .update({ name: name.trim(), phone: phone||null, email: email||null, address: address||null, notes: notes||null })
+      .eq('id', params.id).select().single()
+    return NextResponse.json(data)
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const db = await getDb()
-    runSql(db, `DELETE FROM members WHERE id = ?`, [Number(params.id)])
+    await supabase.from('members').delete().eq('id', params.id)
     return NextResponse.json({ ok: true })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }

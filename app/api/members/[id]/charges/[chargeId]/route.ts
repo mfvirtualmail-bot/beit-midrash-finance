@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, runSql } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string; chargeId: string } }) {
   try {
-    const db = await getDb()
-    runSql(db, `DELETE FROM member_charges WHERE id = ? AND member_id = ?`,
-      [Number(params.chargeId), Number(params.id)])
+    await supabase.from('member_charges').delete().eq('id', params.chargeId).eq('member_id', params.id)
     return NextResponse.json({ ok: true })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }

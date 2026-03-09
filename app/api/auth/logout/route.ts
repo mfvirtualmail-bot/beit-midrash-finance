@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 import { COOKIE_NAME } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
     const token = req.cookies.get(COOKIE_NAME)?.value
-    if (token) {
-      const db = await getDb()
-      db.run(`DELETE FROM sessions WHERE token = ?`, [token])
-    }
+    if (token) await supabase.from('sessions').delete().eq('token', token)
     const res = NextResponse.json({ ok: true })
     res.cookies.delete(COOKIE_NAME)
     return res

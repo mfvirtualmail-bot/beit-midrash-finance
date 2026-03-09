@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, queryAll, queryOne, runSql } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
+
+function flattenTx(t: Record<string, unknown>) {
+  const cat = t.categories as Record<string, string> | null
+  return { ...t, categories: undefined,
+    category_name_he: cat?.name_he ?? null,
+    category_name_en: cat?.name_en ?? null,
+    category_color: cat?.color ?? null,
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
-    const db = await getDb()
     const { searchParams } = new URL(req.url)
     const type = searchParams.get('type')
     const category = searchParams.get('category')
@@ -12,55 +20,28 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search')
     const limit = parseInt(searchParams.get('limit') || '100')
 
-    let query = `
-      SELECT t.*, c.name_he as category_name_he, c.name_en as category_name_en, c.color as category_color
-      FROM transactions t
-      LEFT JOIN categories c ON t.category_id = c.id
-      WHERE 1=1
-    `
-    const args: (string | number | null)[] = []
+    let q = supabase.from('transactions').select('*, categories(name_he, name_en, color)')
+      .order('date', { ascending: false }).order('created_at', { ascending: false }).limit(limit)
 
-    if (type) { query += ' AND t.type = ?'; args.push(type) }
-    if (category) { query += ' AND t.category_id = ?'; args.push(parseInt(category)) }
-    if (month) { query += " AND strftime('%Y-%m', t.date) = ?"; args.push(month) }
-    if (year) { query += " AND strftime('%Y', t.date) = ?"; args.push(year) }
-    if (search) {
-      query += ' AND (t.description_he LIKE ? OR t.description_en LIKE ? OR t.notes LIKE ?)'
-      args.push(`%${search}%`, `%${search}%`, `%${search}%`)
-    }
+    if (type) q = q.eq('type', type)
+    if (category) q = q.eq('category_id', parseInt(category))
+    if (month) q = q.gte('date', `${month}-01`).lte('date', `${month}-31`)
+    if (year) q = q.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`)
+    if (search) q = q.or(`description_he.ilike.%${search}%,description_en.ilike.%${search}%,notes.ilike.%${search}%`)
 
-    query += ' ORDER BY t.date DESC, t.created_at DESC LIMIT ?'
-    args.push(limit)
-
-    const transactions = queryAll(db, query, args)
-    return NextResponse.json(transactions)
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    const { data } = await q
+    return NextResponse.json((data ?? []).map(flattenTx))
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const db = await getDb()
-    const body = await req.json()
-    const { type, amount, description_he, description_en, category_id, date, notes } = body
-    if (!type || !amount || !date) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
-    const { lastId } = runSql(db,
-      'INSERT INTO transactions (type, amount, description_he, description_en, category_id, date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [type, amount, description_he || null, description_en || null, category_id || null, date, notes || null]
-    )
-
-    const transaction = queryOne(db,
-      `SELECT t.*, c.name_he as category_name_he, c.name_en as category_name_en, c.color as category_color
-       FROM transactions t LEFT JOIN categories c ON t.category_id = c.id
-       WHERE t.id = ?`,
-      [lastId]
-    )
-
-    return NextResponse.json(transaction, { status: 201 })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
-  }
+    const { type, amount, description_he, description_en, category_id, date, notes } = await req.json()
+    if (!type || !amount || !date) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    const { data } = await supabase.from('transactions')
+      .insert({ type, amount, description_he: description_he||null, description_en: description_en||null,
+        category_id: category_id||null, date, notes: notes||null })
+      .select('*, categories(name_he, name_en, color)').single()
+    return NextResponse.json(flattenTx(data as Record<string, unknown>), { status: 201 })
+  } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }

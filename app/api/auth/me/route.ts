@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb, queryOne } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 import { COOKIE_NAME } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
     const token = req.cookies.get(COOKIE_NAME)?.value
     if (!token) return NextResponse.json(null)
-
-    const db = await getDb()
-    const user = queryOne(db,
-      `SELECT u.id, u.username, u.display_name
-       FROM sessions s JOIN users u ON s.user_id = u.id
-       WHERE s.token = ? AND s.expires_at > datetime('now')`,
-      [token]
-    )
-    return NextResponse.json(user || null)
-  } catch (e) {
-    return NextResponse.json(null)
-  }
+    const { data: session } = await supabase.from('sessions').select('user_id')
+      .eq('token', token).gt('expires_at', new Date().toISOString()).single()
+    if (!session) return NextResponse.json(null)
+    const { data: user } = await supabase.from('users')
+      .select('id, username, display_name').eq('id', session.user_id).single()
+    return NextResponse.json(user ?? null)
+  } catch { return NextResponse.json(null) }
 }
