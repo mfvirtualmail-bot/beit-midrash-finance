@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       SELECT
         t.date as "תאריך / Date",
         CASE t.type WHEN 'income' THEN 'הכנסה / Income' ELSE 'הוצאה / Expense' END as "סוג / Type",
-        t.amount as "סכום / Amount (₪)",
+        t.amount as "סכום / Amount (€)",
         COALESCE(c.name_he, '') as "קטגוריה / Category (HE)",
         COALESCE(c.name_en, '') as "Category (EN)",
         COALESCE(t.description_he, '') as "תיאור / Description (HE)",
@@ -59,12 +59,12 @@ export async function GET(req: NextRequest) {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Transactions')
 
-    const totalIncome = rows.filter(r => String(r['סוג / Type']).includes('הכנסה')).reduce((s, r) => s + (Number(r['סכום / Amount (₪)']) || 0), 0)
-    const totalExpense = rows.filter(r => String(r['סוג / Type']).includes('הוצאה')).reduce((s, r) => s + (Number(r['סכום / Amount (₪)']) || 0), 0)
+    const totalIncome = rows.filter(r => String(r['סוג / Type']).includes('הכנסה')).reduce((s, r) => s + (Number(r['סכום / Amount (€)']) || 0), 0)
+    const totalExpense = rows.filter(r => String(r['סוג / Type']).includes('הוצאה')).reduce((s, r) => s + (Number(r['סכום / Amount (€)']) || 0), 0)
     const summary = [
-      { 'פריט / Item': 'סה"כ הכנסות / Total Income', 'סכום / Amount (₪)': totalIncome },
-      { 'פריט / Item': 'סה"כ הוצאות / Total Expenses', 'סכום / Amount (₪)': totalExpense },
-      { 'פריט / Item': 'יתרה / Balance', 'סכום / Amount (₪)': totalIncome - totalExpense },
+      { 'פריט / Item': 'סה"כ הכנסות / Total Income', 'סכום / Amount (€)': totalIncome },
+      { 'פריט / Item': 'סה"כ הוצאות / Total Expenses', 'סכום / Amount (€)': totalExpense },
+      { 'פריט / Item': 'יתרה / Balance', 'סכום / Amount (€)': totalIncome - totalExpense },
     ]
     const ws2 = XLSX.utils.json_to_sheet(summary)
     XLSX.utils.book_append_sheet(wb, ws2, 'Summary')

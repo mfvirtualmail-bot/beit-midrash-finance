@@ -1,5 +1,12 @@
 import path from 'path'
 import fs from 'fs'
+import crypto from 'crypto'
+
+function _hashSync(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex')
+  const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex')
+  return `${salt}:${hash}`
+}
 
 // Dynamic import for sql.js to avoid module format issues
 type SqlJsDatabase = {
@@ -116,6 +123,84 @@ function initSchema(database: SqlJsDatabase) {
     )
   `)
 
+  // Users & sessions
+  database.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `)
+
+  // Members
+  database.run(`
+    CREATE TABLE IF NOT EXISTS members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      phone TEXT,
+      email TEXT,
+      address TEXT,
+      notes TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_by INTEGER REFERENCES users(id)
+    )
+  `)
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS member_charges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      amount REAL NOT NULL CHECK(amount > 0),
+      date TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_by INTEGER REFERENCES users(id)
+    )
+  `)
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS member_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+      amount REAL NOT NULL CHECK(amount > 0),
+      date TEXT NOT NULL,
+      method TEXT NOT NULL DEFAULT 'cash',
+      reference TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_by INTEGER REFERENCES users(id)
+    )
+  `)
+
+  // Migration: add created_by to transactions
+  try { database.run(`ALTER TABLE transactions ADD COLUMN created_by INTEGER REFERENCES users(id)`) } catch { /* already exists */ }
+
+  // Seed default users
+  const userCount = database.exec("SELECT COUNT(*) as c FROM users")
+  const uc = userCount.length > 0 ? (userCount[0].values[0][0] as number) : 0
+  if (uc === 0) {
+    database.run(`INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)`,
+      ['admin', _hashSync('admin123'), 'מנהל / Admin'])
+    database.run(`INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)`,
+      ['user1', _hashSync('1234'), 'משתמש 1 / User 1'])
+    database.run(`INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)`,
+      ['user2', _hashSync('1234'), 'משתמש 2 / User 2'])
+    saveDb()
+  }
+
   // Seed default categories if empty
   const count = database.exec("SELECT COUNT(*) as c FROM categories")
   const catCount = count.length > 0 ? (count[0].values[0][0] as number) : 0
@@ -158,4 +243,48 @@ export interface Transaction {
   category_name_he?: string
   category_name_en?: string
   category_color?: string
+}
+
+export interface User {
+  id: number
+  username: string
+  display_name: string
+  created_at: string
+}
+
+export interface Member {
+  id: number
+  name: string
+  phone: string | null
+  email: string | null
+  address: string | null
+  notes: string | null
+  active: number
+  created_at: string
+  total_charges?: number
+  total_payments?: number
+  balance?: number
+}
+
+export interface MemberCharge {
+  id: number
+  member_id: number
+  description: string
+  amount: number
+  date: string
+  notes: string | null
+  created_at: string
+  created_by_name?: string
+}
+
+export interface MemberPayment {
+  id: number
+  member_id: number
+  amount: number
+  date: string
+  method: string
+  reference: string | null
+  notes: string | null
+  created_at: string
+  created_by_name?: string
 }

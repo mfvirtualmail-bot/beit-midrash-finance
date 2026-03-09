@@ -1,19 +1,44 @@
 'use client'
 import './globals.css'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Menu, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut } from 'lucide-react'
 import { LangProvider, useLang } from '@/lib/LangContext'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+type AuthUser = { id: number; username: string; display_name: string } | null
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { lang, setLang, T, isRTL } = useLang()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [user, setUser] = useState<AuthUser>(null)
   const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (pathname !== '/login') {
+      fetch('/api/auth/me').then(r => r.json()).then(setUser).catch(() => {})
+    }
+  }, [pathname])
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    setUser(null)
+    router.push('/login')
+  }
+
+  if (pathname === '/login') {
+    return (
+      <html lang={lang} dir={isRTL ? 'rtl' : 'ltr'}>
+        <body>{children}</body>
+      </html>
+    )
+  }
 
   const navItems = [
     { href: '/', label: T.dashboard, icon: LayoutDashboard },
     { href: '/transactions', label: T.transactions, icon: ArrowLeftRight },
+    { href: '/members', label: T.members, icon: Users },
     { href: '/categories', label: T.categories, icon: Tag },
     { href: '/reports', label: T.reports, icon: BarChart2 },
   ]
@@ -29,12 +54,27 @@ function Shell({ children }: { children: React.ReactNode }) {
                 <span className="font-bold text-lg">{T.appName}</span>
               </div>
               <div className="flex items-center gap-3">
+                {user && (
+                  <span className="text-sm text-blue-100 hidden sm:block">
+                    {T.welcomeUser}, <span className="font-semibold text-white">{user.display_name.split('/')[0].trim()}</span>
+                  </span>
+                )}
                 <button
                   onClick={() => setLang(lang === 'he' ? 'en' : 'he')}
                   className="text-sm bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg transition-colors font-medium"
                 >
                   {T.switchLang}
                 </button>
+                {user && (
+                  <button
+                    onClick={handleLogout}
+                    className="text-sm bg-blue-600 hover:bg-red-500 px-3 py-1.5 rounded-lg transition-colors font-medium flex items-center gap-1"
+                    title={T.logout}
+                  >
+                    <LogOut size={14} />
+                    <span className="hidden sm:inline">{T.logout}</span>
+                  </button>
+                )}
                 <button className="sm:hidden p-2 rounded hover:bg-blue-600" onClick={() => setMenuOpen(!menuOpen)}>
                   {menuOpen ? <X size={20} /> : <Menu size={20} />}
                 </button>
@@ -51,7 +91,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             `}>
               <nav className="p-4 space-y-1 mt-2">
                 {navItems.map(({ href, label, icon: Icon }) => {
-                  const active = pathname === href
+                  const active = pathname === href || (href !== '/' && pathname.startsWith(href))
                   return (
                     <Link key={href} href={href} onClick={() => setMenuOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors
