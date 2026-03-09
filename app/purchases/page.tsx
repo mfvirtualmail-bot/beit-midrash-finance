@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
 import { Category, Member } from '@/lib/db'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE, getShabbatOrHolidayLabel } from '@/lib/hebrewDate'
-import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, Settings, Edit2 } from 'lucide-react'
+import { MONTH_HE, MONTH_EN, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange } from '@/lib/hebrewDate'
+import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Settings, Edit2, Calendar } from 'lucide-react'
 
 interface PurchaseRow {
   id: string
@@ -26,13 +27,20 @@ function getHebrewWeekStart(date: Date): Date {
   return sunday
 }
 
-function getRecentWeeks(): Array<{ label: string; dateStr: string; shabbatLabel: string }> {
-  const weeks = []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  for (let i = 0; i < 12; i++) {
-    const sunday = getHebrewWeekStart(today)
-    sunday.setDate(sunday.getDate() - i * 7)
+function getWeeksForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 'en' = 'he'): Array<{ label: string; dateStr: string; shabbatLabel: string; shabbatLabelEn: string }> {
+  const range = hebrewMonthToGregorianRange(hebrewMonth, hebrewYear)
+  const startDate = new Date(range.start)
+  const endDate = new Date(range.end)
+  const firstSunday = getHebrewWeekStart(startDate)
+  const lastDate = new Date(endDate)
+  const lastSat = new Date(lastDate)
+  lastSat.setDate(lastDate.getDate() + (6 - lastDate.getDay()))
+
+  const weeks: Array<{ label: string; dateStr: string; shabbatLabel: string; shabbatLabelEn: string }> = []
+  const current = new Date(firstSunday)
+
+  while (current <= lastSat) {
+    const sunday = new Date(current)
     const saturday = new Date(sunday)
     saturday.setDate(sunday.getDate() + 6)
     const hdSun = new HDate(sunday)
@@ -48,12 +56,16 @@ function getRecentWeeks(): Array<{ label: string; dateStr: string; shabbatLabel:
     const greg = `${sunday.toLocaleDateString('en-GB')} – ${saturday.toLocaleDateString('en-GB')}`
     const sundayStr = sunday.toISOString().split('T')[0]
     const shabbatLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
+    const shabbatLabelEn = getShabbatOrHolidayLabel(sundayStr, 'en')
     weeks.push({
       label: `${shabbatLabel ? shabbatLabel + ' | ' : ''}${hebrewLabel}  (${greg})`,
       dateStr: sundayStr,
       shabbatLabel,
+      shabbatLabelEn,
     })
+    current.setDate(current.getDate() + 7)
   }
+
   return weeks
 }
 
@@ -110,12 +122,44 @@ function MemberSelect({ members, value, onChange, placeholder }: {
   )
 }
 
-export default function PurchasesPage() {
+function PurchasesPageInner() {
   const { T, lang, isRTL } = useLang()
+  const searchParams = useSearchParams()
   const [categories, setCategories] = useState<Category[]>([])
   const [members, setMembers] = useState<Member[]>([])
-  const weeks = getRecentWeeks()
-  const [weekDate, setWeekDate] = useState(weeks[0].dateStr)
+
+  // Hebrew month navigation
+  const todayHeb = new HDate(new Date())
+  const [hebrewYear, setHebrewYear] = useState(todayHeb.getFullYear())
+  const [hebrewMonth, setHebrewMonth] = useState(todayHeb.getMonth())
+  const monthsInYear = getHebrewMonthsInYear(hebrewYear)
+  const currentMonthInfo = monthsInYear.find(m => m.month === hebrewMonth)
+
+  const weeks = getWeeksForMonth(hebrewMonth, hebrewYear, lang as 'he' | 'en')
+  const initialWeek = searchParams?.get('week') ?? weeks[0]?.dateStr ?? ''
+  const [weekDate, setWeekDate] = useState(initialWeek)
+
+  // If weekDate is not in current month's weeks, select the first one
+  const weekInList = weeks.find(w => w.dateStr === weekDate)
+  const effectiveWeekDate = weekInList ? weekDate : (weeks[0]?.dateStr ?? '')
+
+  function navigateMonth(dir: -1 | 1) {
+    const idx = monthsInYear.findIndex(m => m.month === hebrewMonth)
+    const newIdx = idx + dir
+    if (newIdx >= 0 && newIdx < monthsInYear.length) {
+      setHebrewMonth(monthsInYear[newIdx].month)
+    } else if (dir === 1) {
+      const nextYear = hebrewYear + 1
+      const nextMonths = getHebrewMonthsInYear(nextYear)
+      setHebrewYear(nextYear)
+      setHebrewMonth(nextMonths[0].month)
+    } else if (dir === -1) {
+      const prevYear = hebrewYear - 1
+      const prevMonths = getHebrewMonthsInYear(prevYear)
+      setHebrewYear(prevYear)
+      setHebrewMonth(prevMonths[prevMonths.length - 1].month)
+    }
+  }
   const [rows, setRows] = useState<PurchaseRow[]>([newRow(), newRow(), newRow()])
   const [saving, setSaving] = useState(false)
   const [savedCount, setSavedCount] = useState<number | null>(null)
@@ -145,7 +189,7 @@ export default function PurchasesPage() {
   function addRow() { setRows(prev => [...prev, newRow()]) }
   function removeRow(id: string) { setRows(prev => prev.filter(r => r.id !== id)) }
 
-  const selectedWeek = weeks.find(w => w.dateStr === weekDate)
+  const selectedWeek = weeks.find(w => w.dateStr === effectiveWeekDate)
   const shabbatLabel = selectedWeek?.shabbatLabel ?? ''
 
   async function handleSave() {
@@ -166,7 +210,7 @@ export default function PurchasesPage() {
         description_en: null,
         category_id: r.category_id || null,
         member_id: r.member_id || null,
-        date: weekDate,
+        date: effectiveWeekDate,
         notes: notesStr,
       }
     })
@@ -240,18 +284,38 @@ export default function PurchasesPage() {
       )}
 
       <div className="card">
-        <div className="mb-6">
-          <label className="label text-base font-semibold">
-            {lang === 'he' ? 'בחר שבוע / חג' : 'Select Week / Holiday'}
-          </label>
-          <select className="input w-full max-w-xl text-sm" dir="rtl" value={weekDate} onChange={e => setWeekDate(e.target.value)}>
-            {weeks.map(w => (
-              <option key={w.dateStr} value={w.dateStr}>{w.label}</option>
-            ))}
-          </select>
+        <div className="mb-6 space-y-4">
+          {/* Hebrew month navigation */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+            <button onClick={() => navigateMonth(isRTL ? 1 : -1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+              <ChevronLeft size={18} />
+            </button>
+            <div className="text-center">
+              <span className="font-bold text-gray-900">
+                {lang === 'he' ? currentMonthInfo?.nameHe : currentMonthInfo?.nameEn}
+              </span>
+              <span className="text-sm text-gray-500 mx-2">{hebrewYear}</span>
+            </div>
+            <button onClick={() => navigateMonth(isRTL ? -1 : 1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          <div>
+            <label className="label text-base font-semibold">
+              {lang === 'he' ? 'בחר שבוע / חג' : 'Select Week / Holiday'}
+            </label>
+            <select className="input w-full max-w-xl text-sm" dir="rtl" value={effectiveWeekDate} onChange={e => setWeekDate(e.target.value)}>
+              {weeks.map(w => (
+                <option key={w.dateStr} value={w.dateStr}>{w.label}</option>
+              ))}
+            </select>
+          </div>
+
           {selectedWeek?.shabbatLabel && (
-            <div className="mt-2 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm font-medium" dir="rtl">
-              ✡ {selectedWeek.shabbatLabel}
+            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm font-medium" dir="rtl">
+              <Calendar size={14} />
+              {lang === 'he' ? selectedWeek.shabbatLabel : selectedWeek.shabbatLabelEn}
             </div>
           )}
         </div>
@@ -412,5 +476,13 @@ export default function PurchasesPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function PurchasesPage() {
+  return (
+    <Suspense>
+      <PurchasesPageInner />
+    </Suspense>
   )
 }
