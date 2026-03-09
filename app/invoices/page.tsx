@@ -335,13 +335,9 @@ export default function InvoicesPage() {
                 <label className="label">{T.dueDate}</label>
                 <input type="date" className="input w-full" value={editing.due_date || ''} onChange={e => setEditing(p => ({ ...p, due_date: e.target.value }))} />
               </div>
-              <div>
-                <label className="label">{T.nameHe} *</label>
-                <input className="input w-full" dir="rtl" value={editing.title_he || ''} onChange={e => setEditing(p => ({ ...p, title_he: e.target.value }))} />
-              </div>
-              <div>
-                <label className="label">{T.nameEn}</label>
-                <input className="input w-full" dir="ltr" value={editing.title_en || ''} onChange={e => setEditing(p => ({ ...p, title_en: e.target.value }))} />
+              <div className="col-span-2">
+                <label className="label">{T.invoiceTitle} *</label>
+                <input className="input w-full" value={editing.title_he || ''} onChange={e => setEditing(p => ({ ...p, title_he: e.target.value, title_en: e.target.value }))} />
               </div>
               <div>
                 <label className="label">{T.member}</label>
@@ -374,13 +370,9 @@ export default function InvoicesPage() {
               <div className="space-y-2">
                 {(editing.items ?? []).map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-4">
-                      <input className="input w-full text-sm" dir="rtl" placeholder={T.descriptionHe} value={item.description_he}
-                        onChange={e => updateItem(idx, 'description_he', e.target.value)} />
-                    </div>
-                    <div className="col-span-3">
-                      <input className="input w-full text-sm" dir="ltr" placeholder={T.descriptionEn} value={item.description_en}
-                        onChange={e => updateItem(idx, 'description_en', e.target.value)} />
+                    <div className="col-span-7">
+                      <input className="input w-full text-sm" placeholder={T.description} value={item.description_he}
+                        onChange={e => { updateItem(idx, 'description_he', e.target.value); updateItem(idx, 'description_en', e.target.value) }} />
                     </div>
                     <div className="col-span-2">
                       <input type="number" className="input w-full text-sm" placeholder={T.quantity} value={item.quantity}

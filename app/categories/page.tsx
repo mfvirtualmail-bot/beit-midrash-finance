@@ -40,11 +40,10 @@ export default function CategoriesPage() {
 
   const handleSave = async () => {
     if (!form.name_he) return
-    if (form.type !== 'purchase' && !form.name_en) return
     setSaving(true)
     const body = form.type === 'purchase'
       ? { name_he: form.name_he, name_en: form.name_he, type: form.type, color: '#6b7280' }
-      : form
+      : { ...form, name_en: form.name_en || form.name_he }
     if (editing) {
       await fetch(`/api/categories/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     } else {
@@ -198,16 +197,9 @@ export default function CategoriesPage() {
               </div>
 
               <div>
-                <label className="label">{T.nameHe}</label>
-                <input className="input" dir="rtl" value={form.name_he} onChange={e => setForm(f => ({ ...f, name_he: e.target.value }))} />
+                <label className="label">{T.name}</label>
+                <input className="input" value={form.name_he} onChange={e => setForm(f => ({ ...f, name_he: e.target.value }))} />
               </div>
-
-              {!isPurchase && (
-                <div>
-                  <label className="label">{T.nameEn}</label>
-                  <input className="input" dir="ltr" value={form.name_en} onChange={e => setForm(f => ({ ...f, name_en: e.target.value }))} />
-                </div>
-              )}
 
               {!isPurchase && (
                 <div>

@@ -78,6 +78,7 @@ export default function TransactionsPage() {
       ...form,
       amount: parseFloat(form.amount),
       category_id: form.category_id ? parseInt(form.category_id) : null,
+      description_en: form.description_he,
     }
     if (editing) {
       await fetch(`/api/transactions/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -260,15 +261,9 @@ export default function TransactionsPage() {
               </div>
 
               {/* Description */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">{T.descriptionHe}</label>
-                  <input className="input" value={form.description_he} onChange={e => setForm(f => ({ ...f, description_he: e.target.value }))} dir="rtl" />
-                </div>
-                <div>
-                  <label className="label">{T.descriptionEn}</label>
-                  <input className="input" value={form.description_en} onChange={e => setForm(f => ({ ...f, description_en: e.target.value }))} dir="ltr" />
-                </div>
+              <div>
+                <label className="label">{T.description}</label>
+                <input className="input" value={form.description_he} onChange={e => setForm(f => ({ ...f, description_he: e.target.value }))} />
               </div>
 
               {/* Notes */}

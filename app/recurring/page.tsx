@@ -148,13 +148,9 @@ export default function RecurringPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto" dir={isRTL ? 'rtl' : 'ltr'}>
             <h2 className="text-lg font-bold">{editing.id ? T.editRecurring : T.addRecurring}</h2>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">{T.nameHe} *</label>
-                <input className="input w-full" dir="rtl" value={editing.name_he || ''} onChange={e => setEditing(p => ({ ...p, name_he: e.target.value }))} />
-              </div>
-              <div>
-                <label className="label">{T.nameEn}</label>
-                <input className="input w-full" dir="ltr" value={editing.name_en || ''} onChange={e => setEditing(p => ({ ...p, name_en: e.target.value }))} />
+              <div className="col-span-2">
+                <label className="label">{T.name} *</label>
+                <input className="input w-full" value={editing.name_he || ''} onChange={e => setEditing(p => ({ ...p, name_he: e.target.value, name_en: e.target.value }))} />
               </div>
               <div>
                 <label className="label">{T.type} *</label>
