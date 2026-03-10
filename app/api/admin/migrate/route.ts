@@ -4,6 +4,20 @@ const MIGRATION_SQL = `
 ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_type_check;
 ALTER TABLE categories ADD CONSTRAINT categories_type_check CHECK (type IN ('income', 'expense', 'purchase'));
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS member_id bigint REFERENCES members(id) ON DELETE SET NULL;
+
+-- v3: Collectors
+CREATE TABLE IF NOT EXISTS collectors (
+  id bigint primary key generated always as identity,
+  name text not null,
+  phone text,
+  email text,
+  commission_percent numeric(5,2) not null default 10,
+  active boolean not null default true,
+  notes text,
+  created_at timestamptz default now()
+);
+ALTER TABLE collectors DISABLE ROW LEVEL SECURITY;
+ALTER TABLE donor_donations ADD COLUMN IF NOT EXISTS collector_id bigint REFERENCES collectors(id) ON DELETE SET NULL;
 `
 
 export async function POST() {

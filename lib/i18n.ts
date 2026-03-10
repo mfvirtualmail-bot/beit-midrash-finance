@@ -210,6 +210,18 @@ export const translations = {
     invoiceHeader: 'כותרת עליונה לחשבונית',
     invoiceFooter: 'כותרת תחתונה לחשבונית',
     settingsSaved: 'ההגדרות נשמרו',
+    // Collectors
+    collectors: 'גבאים',
+    collector: 'גבאי',
+    addCollector: 'הוסף גבאי',
+    editCollector: 'ערוך גבאי',
+    deleteCollector: 'מחק גבאי',
+    commissionPercent: 'אחוז עמלה',
+    commission: 'עמלה',
+    totalCollected: 'סה"כ גבייה',
+    totalCommission: 'סה"כ עמלה',
+    noCollectors: 'אין גבאים',
+    netAmount: 'סכום נטו',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -420,6 +432,18 @@ export const translations = {
     invoiceHeader: 'Invoice Header',
     invoiceFooter: 'Invoice Footer',
     settingsSaved: 'Settings saved',
+    // Collectors
+    collectors: 'Collectors',
+    collector: 'Collector',
+    addCollector: 'Add Collector',
+    editCollector: 'Edit Collector',
+    deleteCollector: 'Delete Collector',
+    commissionPercent: 'Commission %',
+    commission: 'Commission',
+    totalCollected: 'Total Collected',
+    totalCommission: 'Total Commission',
+    noCollectors: 'No collectors',
+    netAmount: 'Net Amount',
   }
 }
 

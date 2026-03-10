@@ -15,6 +15,7 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
 
 type Item = { description_he: string; description_en: string; quantity: number; unit_price: number; amount: number }
 const EMPTY_ITEM: Item = { description_he: '', description_en: '', quantity: 1, unit_price: 0, amount: 0 }
+// Note: quantity is kept internally as 1 but hidden from UI
 
 export default function InvoicesPage() {
   const { T, lang, isRTL } = useLang()
@@ -370,16 +371,12 @@ export default function InvoicesPage() {
               <div className="space-y-2">
                 {(editing.items ?? []).map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-7">
+                    <div className="col-span-8">
                       <input className="input w-full text-sm" placeholder={T.description} value={item.description_he}
                         onChange={e => { updateItem(idx, 'description_he', e.target.value); updateItem(idx, 'description_en', e.target.value) }} />
                     </div>
-                    <div className="col-span-2">
-                      <input type="number" className="input w-full text-sm" placeholder={T.quantity} value={item.quantity}
-                        onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} min="1" />
-                    </div>
-                    <div className="col-span-2">
-                      <input type="number" className="input w-full text-sm" placeholder={T.unitPrice} value={item.unit_price}
+                    <div className="col-span-3">
+                      <input type="number" className="input w-full text-sm" placeholder={T.amount} value={item.unit_price}
                         onChange={e => updateItem(idx, 'unit_price', Number(e.target.value))} min="0" step="0.01" />
                     </div>
                     <div className="col-span-1 text-end">

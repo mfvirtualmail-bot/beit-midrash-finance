@@ -194,3 +194,20 @@ ALTER TABLE categories ADD CONSTRAINT categories_type_check CHECK (type IN ('inc
 
 -- v2: Add member_id to transactions for purchase tracking
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS member_id bigint REFERENCES members(id) ON DELETE SET NULL;
+
+-- v3: Collectors (agents) who collect donations and take a commission percentage
+create table if not exists collectors (
+  id bigint primary key generated always as identity,
+  name text not null,
+  phone text,
+  email text,
+  commission_percent numeric(5,2) not null default 10,
+  active boolean not null default true,
+  notes text,
+  created_at timestamptz default now()
+);
+
+alter table collectors disable row level security;
+
+-- v3: Add collector_id to donor_donations
+ALTER TABLE donor_donations ADD COLUMN IF NOT EXISTS collector_id bigint REFERENCES collectors(id) ON DELETE SET NULL;
