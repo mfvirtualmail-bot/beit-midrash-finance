@@ -131,61 +131,58 @@ export default function InvoiceDetailPage() {
         </div>
 
         <div className="p-8 space-y-6">
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-6 text-sm">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <div className="text-gray-500 text-xs uppercase tracking-wide mb-1">{T.invoiceDate}</div>
+          {/* Invoice meta: date, recipient — compact row */}
+          <div className="flex items-start justify-between gap-4 text-sm">
+            <div>
+              {(invoice.member_name || invoice.donor_name_he) && (
+                <div>
+                  <span className="text-gray-500">{T.recipient}: </span>
+                  <span className="font-bold text-gray-800">{invoice.member_name || invoice.donor_name_he}</span>
+                </div>
+              )}
+            </div>
+            <div className="text-end">
               <div className="font-semibold text-gray-800">{invoice.date}</div>
-              <div className="text-gray-400 text-xs mt-0.5" dir="rtl">{formatHebrewDate(invoice.date, 'he')}</div>
+              <div className="text-gray-400 text-xs" dir="rtl">{formatHebrewDate(invoice.date, 'he')}</div>
+              {invoice.due_date && (
+                <div className="text-amber-600 text-xs mt-1">{T.dueDate}: {invoice.due_date}</div>
+              )}
             </div>
-            {invoice.due_date && (
-              <div className="bg-amber-50 rounded-xl p-3">
-                <div className="text-amber-600 text-xs uppercase tracking-wide mb-1">{T.dueDate}</div>
-                <div className="font-semibold text-gray-800">{invoice.due_date}</div>
-                <div className="text-gray-400 text-xs mt-0.5" dir="rtl">{formatHebrewDate(invoice.due_date, 'he')}</div>
-              </div>
-            )}
           </div>
 
-          {/* Recipient */}
-          {(invoice.member_name || invoice.donor_name_he) && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <div className="text-blue-600 text-xs uppercase tracking-wide mb-1">{T.recipient}</div>
-              <div className="font-bold text-gray-800 text-lg">{invoice.member_name || invoice.donor_name_he}</div>
-            </div>
-          )}
-
-          {/* Title */}
-          <div className="border-b border-gray-100 pb-4">
-            <div className="text-xl font-bold text-gray-900">{invoice.title_he}</div>
-            {invoice.title_en && <div className="text-gray-500 mt-0.5">{invoice.title_en}</div>}
-          </div>
-
-          {/* Items */}
+          {/* Items — 3-column table: Date/Period | Item | Price */}
           {invoice.items && invoice.items.length > 0 && (
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-blue-600 text-white">
-                  <th className="text-start py-3 px-4 rounded-ss-lg font-semibold">{T.description}</th>
-                  <th className="text-end py-3 px-4 rounded-se-lg font-semibold">{T.amount}</th>
+                  <th className="text-start py-3 px-4 rounded-ss-lg font-semibold">{lang === 'he' ? 'תקופה / שבוע' : 'Date / Period'}</th>
+                  <th className="text-start py-3 px-4 font-semibold">{lang === 'he' ? 'פריט' : 'Item'}</th>
+                  <th className="text-end py-3 px-4 rounded-se-lg font-semibold">{lang === 'he' ? 'מחיר' : 'Price'}</th>
                 </tr>
               </thead>
               <tbody>
-                {invoice.items.map((item, i) => (
-                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="py-3 px-4">
-                      <div className="font-medium">{item.description_he}</div>
-                      {item.description_en && item.description_en !== item.description_he && (
-                        <div className="text-gray-400 text-xs">{item.description_en}</div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-end font-semibold">{fmt(Number(item.amount))}</td>
-                  </tr>
-                ))}
+                {invoice.items.map((item, i) => {
+                  // Parse period from item.period or from description (legacy: "period - item")
+                  let period = (item as { period?: string }).period || ''
+                  let itemName = item.description_he || ''
+                  if (!period && itemName.includes(' - ')) {
+                    const parts = itemName.split(' - ')
+                    period = parts[0]
+                    itemName = parts.slice(1).join(' - ')
+                  }
+                  return (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="py-3 px-4 text-gray-600">{period || '—'}</td>
+                      <td className="py-3 px-4 font-medium">{itemName}</td>
+                      <td className="py-3 px-4 text-end font-semibold">{fmt(Number(item.amount))}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="bg-blue-600 text-white">
-                  <td className="py-3 px-4 font-bold text-end rounded-bs-lg">{T.total}</td>
+                  <td className="py-3 px-4 rounded-bs-lg"></td>
+                  <td className="py-3 px-4 font-bold text-end">{T.total}</td>
                   <td className="py-3 px-4 font-bold text-end text-xl rounded-be-lg">{fmt(invoice.total ?? 0)}</td>
                 </tr>
               </tfoot>

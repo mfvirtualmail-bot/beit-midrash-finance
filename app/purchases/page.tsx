@@ -335,7 +335,7 @@ function PurchasesPageInner() {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[220px]">
-                  {lang === 'he' ? 'סוג רכישה' : 'Purchase Type'}
+                  {lang === 'he' ? 'פריט' : 'Item'}
                 </th>
                 <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[200px]">
                   {T.member}
@@ -356,7 +356,7 @@ function PurchasesPageInner() {
                     <select className="input w-full text-sm" dir={isRTL ? 'rtl' : 'ltr'}
                       value={row.category_id}
                       onChange={e => updateRow(row.id, 'category_id', e.target.value ? Number(e.target.value) : '')}>
-                      <option value="">{lang === 'he' ? '— בחר סוג —' : '— Select type —'}</option>
+                      <option value="">{lang === 'he' ? '— בחר פריט —' : '— Select item —'}</option>
                       {purchaseCategories.map(c => (
                         <option key={c.id} value={c.id}>{c.name_he}</option>
                       ))}

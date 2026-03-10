@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS collectors (
 );
 ALTER TABLE collectors DISABLE ROW LEVEL SECURITY;
 ALTER TABLE donor_donations ADD COLUMN IF NOT EXISTS collector_id bigint REFERENCES collectors(id) ON DELETE SET NULL;
+
+-- v4: Add period column to invoice_items for Date/Period display
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS period text;
 `
 
 export async function POST() {

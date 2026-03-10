@@ -41,12 +41,23 @@ export async function GET(req: NextRequest) {
 
   const fmt = (n: number) => `€${n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-  const itemRows = items.map((item: { description_he: string; amount: number }, i: number) => `
+  // 3-column item rows: Period | Item | Price
+  const itemRows = items.map((item: { description_he: string; amount: number; period?: string }, i: number) => {
+    let period = item.period || ''
+    let itemName = item.description_he || ''
+    // Legacy: parse "period - item" from description if no separate period field
+    if (!period && itemName.includes(' - ')) {
+      const parts = itemName.split(' - ')
+      period = parts[0]
+      itemName = parts.slice(1).join(' - ')
+    }
+    return `
     <tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
-      <td style="padding:10px 16px;font-size:13px">${item.description_he || ''}</td>
+      <td style="padding:10px 16px;font-size:13px;color:#4b5563">${period || '—'}</td>
+      <td style="padding:10px 16px;font-size:13px;font-weight:500">${itemName}</td>
       <td style="padding:10px 16px;font-size:13px;text-align:left;font-weight:600">${fmt(Number(item.amount))}</td>
     </tr>
-  `).join('')
+  `}).join('')
 
   const html = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -66,7 +77,6 @@ export async function GET(req: NextRequest) {
   }
   .container { max-width: 700px; margin: 0 auto; padding: 20px; }
   .header { border-bottom: 4px solid #2563eb; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-  .org-info { }
   .org-name { font-size: 22px; font-weight: bold; color: #2563eb; display: flex; align-items: center; gap: 8px; }
   .org-logo { width: 60px; height: 60px; object-fit: contain; }
   .org-details { font-size: 12px; color: #6b7280; margin-top: 4px; }
@@ -77,16 +87,10 @@ export async function GET(req: NextRequest) {
   .status-sent { background: #dbeafe; color: #1d4ed8; }
   .status-paid { background: #dcfce7; color: #15803d; }
   .status-cancelled { background: #fee2e2; color: #dc2626; }
-  .dates { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-  .date-box { background: #f9fafb; border-radius: 8px; padding: 12px; }
-  .date-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 4px; }
-  .date-value { font-size: 14px; font-weight: 600; }
+  .meta-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; font-size: 14px; }
+  .meta-row .recipient { font-weight: bold; font-size: 16px; }
+  .meta-row .date-info { text-align: left; }
   .hebrew-date { font-size: 11px; color: #9ca3af; }
-  .recipient { background: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
-  .recipient-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #2563eb; }
-  .recipient-name { font-size: 16px; font-weight: bold; }
-  .title-section { border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 16px; }
-  .invoice-title { font-size: 18px; font-weight: bold; }
   table { width: 100%; border-collapse: collapse; }
   table thead tr { background: #2563eb !important; color: white; }
   table thead th { padding: 10px 16px; font-size: 13px; font-weight: 600; }
@@ -94,8 +98,6 @@ export async function GET(req: NextRequest) {
   table thead th:last-child { text-align: left; border-radius: 8px 0 0 0; }
   table tfoot tr { background: #2563eb !important; color: white; }
   table tfoot td { padding: 10px 16px; font-weight: bold; }
-  table tfoot td:first-child { text-align: left; border-radius: 0 0 8px 0; }
-  table tfoot td:last-child { text-align: left; font-size: 18px; border-radius: 0 0 0 8px; }
   .notes { background: #f9fafb; border-radius: 8px; padding: 12px; margin-top: 20px; font-size: 13px; color: #4b5563; }
   .notes-label { font-weight: 600; color: #374151; margin-bottom: 4px; }
   .footer { border-top: 2px solid #e5e7eb; padding-top: 16px; margin-top: 24px; font-size: 12px; color: #6b7280; text-align: center; }
@@ -108,7 +110,6 @@ export async function GET(req: NextRequest) {
 </head>
 <body>
 <div class="container">
-  <!-- Print/Download buttons -->
   <div class="no-print" style="margin-bottom:20px;text-align:center">
     <button onclick="window.print()" style="background:#2563eb;color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">
       הורד / הדפס PDF
@@ -117,7 +118,7 @@ export async function GET(req: NextRequest) {
 
   <!-- Header -->
   <div class="header">
-    <div class="org-info">
+    <div>
       <div class="org-name">
         ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Logo" class="org-logo" />` : ''}
         ${orgName}
@@ -133,41 +134,26 @@ export async function GET(req: NextRequest) {
     </div>
   </div>
 
-  <!-- Dates -->
-  <div class="dates">
-    <div class="date-box">
-      <div class="date-label">תאריך חשבונית</div>
-      <div class="date-value">${invoice.date}</div>
-      <div class="hebrew-date">${hebrewDate}</div>
+  <!-- Meta: recipient + date (compact, no duplication) -->
+  <div class="meta-row">
+    <div>
+      ${memberName ? `<div style="color:#6b7280;font-size:12px">נמען</div><div class="recipient">${memberName}</div>` : ''}
     </div>
-    ${invoice.due_date ? `
-    <div class="date-box" style="background:#fffbeb">
-      <div class="date-label" style="color:#d97706">תאריך פירעון</div>
-      <div class="date-value">${invoice.due_date}</div>
-      <div class="hebrew-date">${formatHebrewDate(invoice.due_date, 'he')}</div>
-    </div>` : ''}
+    <div class="date-info">
+      <div style="font-weight:600">${invoice.date}</div>
+      <div class="hebrew-date">${hebrewDate}</div>
+      ${invoice.due_date ? `<div style="color:#d97706;font-size:12px;margin-top:4px">פירעון: ${invoice.due_date}</div>` : ''}
+    </div>
   </div>
 
-  <!-- Recipient -->
-  ${memberName ? `
-  <div class="recipient">
-    <div class="recipient-label">נמען</div>
-    <div class="recipient-name">${memberName}</div>
-  </div>` : ''}
-
-  <!-- Title -->
-  <div class="title-section">
-    <div class="invoice-title">${invoice.title_he || ''}</div>
-    ${invoice.title_en && invoice.title_en !== invoice.title_he ? `<div style="color:#6b7280;font-size:14px">${invoice.title_en}</div>` : ''}
-  </div>
-
-  <!-- Items -->
+  <!-- Items: 3-column table -->
   ${items.length > 0 ? `
   <table>
     <thead>
       <tr>
-        <th style="text-align:right">תיאור</th>
-        <th style="text-align:left">סכום</th>
+        <th style="text-align:right">תקופה / שבוע</th>
+        <th style="text-align:right">פריט</th>
+        <th style="text-align:left">מחיר</th>
       </tr>
     </thead>
     <tbody>
@@ -175,20 +161,19 @@ export async function GET(req: NextRequest) {
     </tbody>
     <tfoot>
       <tr>
-        <td style="text-align:left">סה"כ</td>
-        <td style="text-align:left;font-size:18px">${fmt(invoice.total ?? total)}</td>
+        <td style="border-radius:0 0 8px 0"></td>
+        <td style="text-align:left;font-weight:bold">סה"כ</td>
+        <td style="text-align:left;font-size:18px;border-radius:0 0 0 8px">${fmt(invoice.total ?? total)}</td>
       </tr>
     </tfoot>
   </table>` : ''}
 
-  <!-- Notes -->
   ${invoice.notes ? `
   <div class="notes">
     <div class="notes-label">הערות</div>
     <div style="white-space:pre-line">${invoice.notes}</div>
   </div>` : ''}
 
-  <!-- Footer -->
   ${footerText || orgPhone || orgEmail ? `
   <div class="footer">
     ${footerText ? `<div style="white-space:pre-line">${footerText}</div>` : ''}

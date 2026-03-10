@@ -3,13 +3,17 @@ import { supabase } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 
 // Expected columns:
-// member / חבר / שם (required) | category / קטגוריה / סוג | amount / סכום (required) | date / תאריך | notes / הערות
+// member / חבר / שם (required) — can be existing member or free-text "Other Name"
+// amount / סכום (required)
+// item / פריט / category / קטגוריה (optional)
+// week / שבוע / חג / holiday / period / תקופה (optional — free text, Hebrew date, or holiday name)
+// notes / הערות (optional)
 function normalizeHeader(h: string): string {
   const s = h.trim().toLowerCase()
   if (['member', 'חבר', 'שם', 'name', 'member_name', 'שם חבר'].includes(s)) return 'member'
-  if (['category', 'קטגוריה', 'סוג', 'type', 'סוג רכישה', 'purchase_type'].includes(s)) return 'category'
+  if (['item', 'פריט', 'category', 'קטגוריה', 'סוג', 'type', 'סוג רכישה', 'purchase_type'].includes(s)) return 'item'
   if (['amount', 'סכום', 'sum', 'price', 'מחיר'].includes(s)) return 'amount'
-  if (['date', 'תאריך'].includes(s)) return 'date'
+  if (['week', 'שבוע', 'חג', 'holiday', 'period', 'תקופה', 'date', 'תאריך'].includes(s)) return 'week'
   if (['notes', 'הערות', 'note', 'remarks', 'הערה'].includes(s)) return 'notes'
   return s
 }
@@ -44,7 +48,6 @@ export async function POST(req: NextRequest) {
 
     const memberMap = new Map((members ?? []).map((m: { id: number; name: string }) => [m.name.trim().toLowerCase(), m.id]))
     const categoryMap = new Map((categories ?? []).map((c: { id: number; name_he: string; name_en: string }) => [c.name_he.trim().toLowerCase(), c.id]))
-    // Also map by English name
     for (const c of (categories ?? []) as Array<{ id: number; name_he: string; name_en: string }>) {
       if (c.name_en) categoryMap.set(c.name_en.trim().toLowerCase(), c.id)
     }
@@ -67,29 +70,38 @@ export async function POST(req: NextRequest) {
       const r = normalized[i]
       const amount = parseFloat(r.amount)
       if (!r.member || isNaN(amount) || amount <= 0) {
-        skipped.push(`Row ${i + 2}: missing member or invalid amount`)
+        skipped.push(`Row ${i + 2}: missing member/name or invalid amount`)
         continue
       }
 
+      // Flexible member: try to match existing member, otherwise use as "Other Name"
       const memberId = memberMap.get(r.member.toLowerCase()) ?? null
-      if (!memberId) {
-        skipped.push(`Row ${i + 2}: member "${r.member}" not found`)
-        continue
-      }
-
-      const categoryId = r.category ? (categoryMap.get(r.category.toLowerCase()) ?? null) : null
-      const catName = r.category || ''
       const memberName = r.member
+
+      const categoryId = r.item ? (categoryMap.get(r.item.toLowerCase()) ?? null) : null
+      const itemName = r.item || ''
+      const weekLabel = r.week || ''
+
+      // Build description: include week/holiday + item
+      const descParts = [weekLabel, itemName].filter(Boolean)
+      const descHe = descParts.length > 0 ? descParts.join(' - ') : memberName
+
+      // Store member name in notes if not a system member (so it appears on invoices)
+      const notesParts = []
+      if (!memberId) notesParts.push(`[${memberName}]`)
+      if (weekLabel) notesParts.push(weekLabel)
+      if (r.notes) notesParts.push(r.notes)
+      const notesStr = notesParts.length > 0 ? notesParts.join(' | ') : null
 
       transactions.push({
         type: 'expense',
         amount,
-        description_he: catName ? `${catName} - ${memberName}` : memberName,
+        description_he: descHe,
         description_en: null,
         category_id: categoryId,
         member_id: memberId,
-        date: r.date || defaultDate,
-        notes: r.notes || null,
+        date: defaultDate,
+        notes: notesStr,
       })
     }
 
