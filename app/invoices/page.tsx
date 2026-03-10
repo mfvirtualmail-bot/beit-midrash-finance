@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { Invoice, InvoiceStatus, Member, Donor } from '@/lib/db'
-import { formatHebrewDate } from '@/lib/hebrewDate'
+import { formatHebrewDate, getCurrentHebrewYear, getRecentHebrewYears, hebrewYearToGregorianRange } from '@/lib/hebrewDate'
 import { Plus, FileText, Pencil, Trash2, Eye, Mail, Zap, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -44,10 +44,8 @@ export default function InvoicesPage() {
 
   // Auto-generate state
   const [showGenModal, setShowGenModal] = useState(false)
-  const [genDateFrom, setGenDateFrom] = useState(() => {
-    const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0]
-  })
-  const [genDateTo, setGenDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  const hebrewYears = getRecentHebrewYears()
+  const [genHebrewYear, setGenHebrewYear] = useState(getCurrentHebrewYear())
   const [genLoading, setGenLoading] = useState(false)
   const [genResult, setGenResult] = useState<{ count: number; invoices: { id: number; member: string; total: number; email: string | null }[] } | null>(null)
 
@@ -119,10 +117,11 @@ export default function InvoicesPage() {
 
   async function handleGenerate() {
     setGenLoading(true)
+    const range = hebrewYearToGregorianRange(genHebrewYear)
     const res = await fetch('/api/invoices/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: genDateFrom, date_to: genDateTo }),
+      body: JSON.stringify({ date_from: range.start, date_to: range.end, hebrew_year: genHebrewYear }),
     })
     const data = await res.json()
     setGenResult(data)
@@ -317,18 +316,16 @@ export default function InvoicesPage() {
               <>
                 <p className="text-sm text-gray-600">
                   {lang === 'he'
-                    ? 'בחר תקופה. המערכת תיצור חשבונית לכל חבר שיש לו חיובים בתקופה זו.'
-                    : 'Select a date range. An invoice will be created for each member with charges in that period.'}
+                    ? 'בחר שנה עברית. המערכת תיצור חשבונית לכל חבר שיש לו חיובים ורכישות בשנה זו.'
+                    : 'Select a Hebrew year. An invoice will be created for each member with charges and purchases in that year.'}
                 </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">{lang === 'he' ? 'מתאריך' : 'From Date'}</label>
-                    <input type="date" className="input w-full" value={genDateFrom} onChange={e => setGenDateFrom(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="label">{lang === 'he' ? 'עד תאריך' : 'To Date'}</label>
-                    <input type="date" className="input w-full" value={genDateTo} onChange={e => setGenDateTo(e.target.value)} />
-                  </div>
+                <div>
+                  <label className="label">{lang === 'he' ? 'שנה עברית' : 'Hebrew Year'}</label>
+                  <select className="input w-full" value={genHebrewYear} onChange={e => setGenHebrewYear(Number(e.target.value))}>
+                    {hebrewYears.map(y => (
+                      <option key={y.year} value={y.year}>{y.label} ({y.year})</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex gap-3 justify-end pt-2">
                   <button className="btn-secondary" onClick={() => setShowGenModal(false)}>{T.cancel}</button>

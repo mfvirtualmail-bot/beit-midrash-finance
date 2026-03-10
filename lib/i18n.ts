@@ -222,6 +222,10 @@ export const translations = {
     totalCommission: 'סה"כ עמלה',
     noCollectors: 'אין גבאים',
     netAmount: 'סכום נטו',
+    item: 'פריט',
+    weekHoliday: 'שבוע / חג',
+    period: 'תקופה / שבוע',
+    price: 'מחיר',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -444,6 +448,10 @@ export const translations = {
     totalCommission: 'Total Commission',
     noCollectors: 'No collectors',
     netAmount: 'Net Amount',
+    item: 'Item',
+    weekHoliday: 'Week / Holiday',
+    period: 'Date / Period',
+    price: 'Price',
   }
 }
 

@@ -46,8 +46,8 @@ export default function PurchasesImportPage() {
         <h3 className="font-semibold text-orange-800 mb-2">{he ? 'הוראות' : 'Instructions'}</h3>
         <p className="text-sm text-orange-700 mb-3">
           {he
-            ? 'העלה קובץ Excel (.xlsx, .xls) או CSV עם עמודות הרכישות. שם חבר וסכום הם שדות חובה. שמות החברים חייבים להתאים בדיוק לשמות במערכת.'
-            : 'Upload an Excel (.xlsx, .xls) or CSV file. Member name and amount are required. Member names must exactly match names in the system.'}
+            ? 'העלה קובץ Excel (.xlsx, .xls) או CSV עם עמודות הרכישות. שם/חבר וסכום הם שדות חובה. שם יכול להיות חבר קיים במערכת או שם חופשי (יופיע בחשבונית).'
+            : 'Upload an Excel (.xlsx, .xls) or CSV file. Name/Member and amount are required. Name can be an existing member or a free-text name (will appear on invoices).'}
         </p>
         <div className="overflow-x-auto">
           <table className="text-xs w-full">
@@ -60,10 +60,10 @@ export default function PurchasesImportPage() {
             </thead>
             <tbody>
               {[
-                { col: he ? 'חבר' : 'Member', names: 'member, חבר, שם, name', req: true },
+                { col: he ? 'חבר / שם' : 'Member / Name', names: 'member, חבר, שם, name', req: true },
                 { col: he ? 'סכום' : 'Amount', names: 'amount, סכום, sum, price, מחיר', req: true },
-                { col: he ? 'קטגוריה' : 'Category', names: 'category, קטגוריה, סוג, type', req: false },
-                { col: he ? 'תאריך' : 'Date', names: 'date, תאריך (YYYY-MM-DD)', req: false },
+                { col: he ? 'פריט' : 'Item', names: 'item, פריט, category, קטגוריה, סוג', req: false },
+                { col: he ? 'שבוע / חג' : 'Week / Holiday', names: 'week, שבוע, חג, holiday, period, תקופה', req: false },
                 { col: he ? 'הערות' : 'Notes', names: 'notes, הערות', req: false },
               ].map(r => (
                 <tr key={r.col} className="border-b border-orange-100">

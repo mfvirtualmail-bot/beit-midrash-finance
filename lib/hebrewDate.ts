@@ -210,4 +210,22 @@ export function getShabbatOrHolidayLabel(sundayDateStr: string, lang: 'he' | 'en
   }
 }
 
+// Get Gregorian date range for an entire Hebrew year (Tishrei 1 → Elul end)
+export function hebrewYearToGregorianRange(hebrewYear: number): { start: string; end: string } {
+  const startHd = new HDate(1, months.TISHREI, hebrewYear)
+  const endHd = new HDate(HDate.daysInMonth(months.ELUL, hebrewYear), months.ELUL, hebrewYear)
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  return { start: fmt(startHd.greg()), end: fmt(endHd.greg()) }
+}
+
+// Get recent Hebrew years for selectors (current + previous 2)
+export function getRecentHebrewYears(): Array<{ year: number; label: string }> {
+  const current = getCurrentHebrewYear()
+  const years = []
+  for (let y = current - 2; y <= current + 1; y++) {
+    years.push({ year: y, label: yearToGematriya(y) })
+  }
+  return years
+}
+
 export { MONTH_HE, MONTH_EN, MONTH_ORDER }
