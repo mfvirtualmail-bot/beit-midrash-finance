@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database } from 'lucide-react'
 
 interface OrgSettings {
   org_name_he: string
@@ -36,6 +36,8 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [logoUploading, setLogoUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [migrating, setMigrating] = useState(false)
+  const [migrateMsg, setMigrateMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(data => {
@@ -82,6 +84,24 @@ export default function SettingsPage() {
     setLogoUploading(false)
     setMsg({ type: 'ok', text: lang === 'he' ? 'הלוגו נמחק' : 'Logo deleted' })
     setTimeout(() => setMsg(null), 5000)
+  }
+
+  async function handleMigrate() {
+    setMigrating(true)
+    setMigrateMsg(null)
+    try {
+      const res = await fetch('/api/admin/migrate', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setMigrateMsg({ type: 'ok', text: lang === 'he' ? `מיגרציה הושלמה בהצלחה — גרסה ${data.version ?? ''}` : `Migration completed — version ${data.version ?? ''}` })
+      } else {
+        setMigrateMsg({ type: 'err', text: data.error ?? (lang === 'he' ? 'שגיאה בביצוע מיגרציה' : 'Migration failed') })
+      }
+    } catch {
+      setMigrateMsg({ type: 'err', text: lang === 'he' ? 'שגיאת רשת' : 'Network error' })
+    }
+    setMigrating(false)
+    setTimeout(() => setMigrateMsg(null), 8000)
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -271,6 +291,36 @@ export default function SettingsPage() {
           {saving ? T.loading : T.save}
         </button>
       </form>
+
+      {/* Database Migration */}
+      <div className="card space-y-4">
+        <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+          <Database size={16} className="text-orange-500" />
+          {lang === 'he' ? 'עדכון מסד נתונים' : 'Database Migration'}
+        </h2>
+        <p className="text-xs text-gray-500">
+          {lang === 'he'
+            ? 'לחץ על הכפתור לאחר עדכון האפליקציה כדי ליצור טבלאות חדשות במסד הנתונים.'
+            : 'Click the button after deploying updates to create new database tables.'}
+        </p>
+        {migrateMsg && (
+          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${migrateMsg.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+            {migrateMsg.type === 'ok' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {migrateMsg.text}
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={migrating}
+          onClick={handleMigrate}
+          className="flex items-center gap-2 text-sm px-5 py-2.5 bg-orange-50 border border-orange-300 text-orange-700 hover:bg-orange-100 rounded-xl font-medium disabled:opacity-50"
+        >
+          <Database size={14} />
+          {migrating
+            ? (lang === 'he' ? 'מעדכן...' : 'Migrating...')
+            : (lang === 'he' ? 'הפעל עדכון מסד נתונים' : 'Run Database Migration')}
+        </button>
+      </div>
     </div>
   )
 }
