@@ -120,10 +120,18 @@ export async function POST(req: NextRequest) {
       })
 
       const purchaseItems = memberPurchases.map((p: { description_he: string | null; amount: number; date: string; categories?: { name_he: string } | null }) => {
-        const sundayStr = getWeekSunday(p.date)
-        const weekLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
-        const baseName = p.categories?.name_he ?? (p.description_he ?? 'רכישה')
-        const descHe = weekLabel ? `${weekLabel} - ${baseName}` : baseName
+        // The transaction description_he already has the correct format:
+        // "פרשת האזינו - שלישי", "יום כיפור - כהן", "נר למאור", etc.
+        // The invoice detail page will split on " - " to get period vs item.
+        // If description_he has no parasha info, compute it from the date.
+        let descHe = p.description_he ?? ''
+        if (!descHe) {
+          // No description — use category name with computed week label
+          const sundayStr = getWeekSunday(p.date)
+          const weekLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
+          const catName = p.categories?.name_he ?? 'רכישה'
+          descHe = weekLabel ? `${weekLabel} - ${catName}` : catName
+        }
         return {
           description_he: descHe,
           description_en: descHe,
