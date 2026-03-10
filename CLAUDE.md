@@ -333,17 +333,39 @@ It contains project context, architecture notes, and a running log of all develo
 
 7. **PDF invoices** — Generate actual downloadable PDF files for invoices. Options: use a library like `jspdf` or `@react-pdf/renderer` or server-side PDF generation. Should produce a clean A4 PDF with: organization logo, organization details from settings, invoice number, date, line items, total, Hebrew text support (RTL).
 
-**Plan — build order:**
-1. Save logo image to `public/logo.png`
-2. Fix nikud stripping in `lib/hebrewDate.ts`
-3. Add logo to login, dashboard, layout/header, invoices
-4. Hebrew calendar always in Hebrew
-5. Monthly fee month selector dropdown
-6. Multi-select checkboxes on all list pages
-7. Excel import for bulk purchases
-8. PDF invoice generation
+**All 7 features built and committed (commit `d7077f8`).**
 
-**Status:** About to start building.
+**What was built:**
+
+1. **Logo** — `<img src="/logo.png">` added to: `app/login/page.tsx` (login form header), `app/page.tsx` (dashboard header), `app/layout.tsx` (sidebar/header nav), `app/invoices/[id]/page.tsx` (invoice detail header). **User must place their logo image at `public/logo.png`** — the code references this file but I couldn't save the image from the conversation.
+
+2. **Strip nikud** — Added `stripNikud()` function to `lib/hebrewDate.ts` (removes Unicode \u0591-\u05C7). Applied to all returns from `getShabbatOrHolidayLabel()`. Also applied in `app/calendar/page.tsx` to holiday event rendering.
+
+3. **Hebrew calendar always Hebrew** — `app/calendar/page.tsx`: forced day names to always use `DAY_NAMES_HE`, month names to always use `nameHe`, parasha/holiday labels to always show Hebrew. Gregorian dates in holidays sidebar forced to `he-IL` locale.
+
+4. **Monthly fee month selector** — `app/api/members/monthly-fee/route.ts`: GET accepts `?month=X&year=Y` query params, returns `availableMonths` array (current + previous Hebrew year). POST accepts `{ month, year }` in body. `app/members/page.tsx`: added month dropdown in fee modal, loads available months from API, updates preview when month changes.
+
+5. **Multi-select checkboxes** — Added to 5 list pages: `app/transactions/page.tsx`, `app/members/page.tsx`, `app/donors/page.tsx`, `app/collectors/page.tsx`, `app/invoices/page.tsx`. Each has: select-all checkbox in header, per-row checkbox, batch action bar (shows count + delete button when items selected), blue highlight on selected rows.
+
+6. **Excel import for bulk purchases** — New files:
+   - `app/api/purchases/import/route.ts` — POST endpoint, parses xlsx/xls/csv, matches member names to existing members in DB, creates expense transactions
+   - `app/purchases/import/page.tsx` — drag-and-drop upload page with instructions table
+   - `app/purchases/page.tsx` — added "Import from Excel" button linking to import page
+   - Expected columns: member (required), amount (required), category, date, notes
+
+7. **PDF invoices** — `app/api/invoices/pdf/route.ts`: GET endpoint (`/api/invoices/pdf?id=X`) returns complete HTML page with RTL Hebrew layout, organization logo, settings-based org details, line items table, print-optimized CSS with `@page` A4 setup. Opens in new tab with "Print/Download PDF" button. `app/invoices/[id]/page.tsx`: "Download PDF" button now opens this endpoint instead of calling `window.print()`.
+
+**Files changed/created:**
+- Modified: `lib/hebrewDate.ts`, `app/layout.tsx`, `app/login/page.tsx`, `app/page.tsx`, `app/calendar/page.tsx`, `app/transactions/page.tsx`, `app/members/page.tsx`, `app/donors/page.tsx`, `app/collectors/page.tsx`, `app/invoices/page.tsx`, `app/invoices/[id]/page.tsx`, `app/purchases/page.tsx`, `app/api/members/monthly-fee/route.ts`, `package.json`, `package-lock.json`
+- Created: `app/api/invoices/pdf/route.ts`, `app/api/purchases/import/route.ts`, `app/purchases/import/page.tsx`
+- Dependencies added: `jspdf` (installed but not actively used — PDF is done via HTML rendering instead)
+
+**IMPORTANT for deployment:**
+- User must place logo image file at `public/logo.png` before deploying
+- Need to merge branch `claude/explain-date-codebase-3glPM` to `main` for Vercel deploy
+- Run `POST /api/admin/migrate` after deploy (for collectors table from session 6)
+
+**Git state:** On branch `claude/explain-date-codebase-3glPM`, pushed to origin. 3 commits ahead of remote main.
 
 ---
 
