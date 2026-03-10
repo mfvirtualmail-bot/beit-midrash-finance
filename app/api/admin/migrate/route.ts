@@ -21,6 +21,10 @@ ALTER TABLE donor_donations ADD COLUMN IF NOT EXISTS collector_id bigint REFEREN
 
 -- v4: Add period column to invoice_items for Date/Period display
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS period text;
+
+-- v5: Allow 'purchase' type in transactions table
+ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
+ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'purchase'));
 `
 
 export async function POST() {
