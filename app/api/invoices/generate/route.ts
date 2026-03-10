@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, getSessionUser } from '@/lib/supabase'
 import { COOKIE_NAME } from '@/lib/auth'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE, hebrewYearStr } from '@/lib/hebrewDate'
+import { MONTH_HE, hebrewYearStr, getShabbatOrHolidayLabel } from '@/lib/hebrewDate'
+
+function getWeekSunday(dateStr: string): string {
+  const d = new Date(dateStr)
+  const dow = d.getDay()
+  d.setDate(d.getDate() - dow)
+  return d.toISOString().split('T')[0]
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -86,14 +93,20 @@ export async function POST(req: NextRequest) {
         amount: Number(charge.amount),
       }))
 
-      const purchaseItems = memberPurchases.map((p: { description_he: string | null; amount: number; categories?: { name_he: string } | null }) => ({
-        invoice_id: (invoice as { id: number }).id,
-        description_he: p.description_he ?? (p.categories?.name_he ?? 'רכישה'),
-        description_en: p.description_he ?? 'Purchase',
-        quantity: 1,
-        unit_price: Number(p.amount),
-        amount: Number(p.amount),
-      }))
+      const purchaseItems = memberPurchases.map((p: { description_he: string | null; amount: number; date: string; categories?: { name_he: string } | null }) => {
+        const sundayStr = getWeekSunday(p.date)
+        const weekLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
+        const baseName = p.description_he ?? (p.categories?.name_he ?? 'רכישה')
+        const descHe = weekLabel ? `${weekLabel} - ${baseName}` : baseName
+        return {
+          invoice_id: (invoice as { id: number }).id,
+          description_he: descHe,
+          description_en: p.description_he ?? 'Purchase',
+          quantity: 1,
+          unit_price: Number(p.amount),
+          amount: Number(p.amount),
+        }
+      })
 
       const allItems = [...chargeItems, ...purchaseItems]
       if (allItems.length > 0) {

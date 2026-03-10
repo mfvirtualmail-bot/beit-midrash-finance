@@ -83,6 +83,9 @@ export default function InvoiceDetailPage() {
               <Mail size={15} /> {T.sendEmail}
             </button>
           ) : null}
+          <button onClick={() => window.print()} className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium">
+            <Download size={15} /> {T.downloadPDF}
+          </button>
           <button onClick={() => window.print()} className="btn-primary flex items-center gap-2">
             <Printer size={16} /> {T.printInvoice}
           </button>
@@ -161,9 +164,7 @@ export default function InvoiceDetailPage() {
               <thead>
                 <tr className="bg-blue-600 text-white">
                   <th className="text-start py-3 px-4 rounded-ss-lg font-semibold">{T.description}</th>
-                  <th className="text-center py-3 px-3 font-semibold">{T.quantity}</th>
-                  <th className="text-end py-3 px-3 font-semibold">{T.unitPrice}</th>
-                  <th className="text-end py-3 px-4 rounded-se-lg font-semibold">{T.total}</th>
+                  <th className="text-end py-3 px-4 rounded-se-lg font-semibold">{T.amount}</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,15 +176,13 @@ export default function InvoiceDetailPage() {
                         <div className="text-gray-400 text-xs">{item.description_en}</div>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-center text-gray-600">{item.quantity}</td>
-                    <td className="py-3 px-3 text-end text-gray-600">{fmt(Number(item.unit_price))}</td>
                     <td className="py-3 px-4 text-end font-semibold">{fmt(Number(item.amount))}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-blue-600 text-white">
-                  <td colSpan={3} className="py-3 px-4 font-bold text-end rounded-bs-lg">{T.total}</td>
+                  <td className="py-3 px-4 font-bold text-end rounded-bs-lg">{T.total}</td>
                   <td className="py-3 px-4 font-bold text-end text-xl rounded-be-lg">{fmt(invoice.total ?? 0)}</td>
                 </tr>
               </tfoot>
@@ -216,8 +215,29 @@ export default function InvoiceDetailPage() {
       <style>{`
         @media print {
           .print\\:hidden { display: none !important; }
-          body { margin: 0; background: white; }
-          #invoice-print { box-shadow: none !important; border: none !important; }
+          body { margin: 0; padding: 0; background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          html { background: white !important; }
+          /* Hide Next.js layout chrome */
+          nav, header, aside, footer:not(#invoice-print footer) { display: none !important; }
+          main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+          /* Invoice container */
+          #invoice-print {
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            font-size: 12pt;
+          }
+          #invoice-print * { border-radius: 0 !important; }
+          /* Preserve table header colors */
+          #invoice-print table thead tr { background-color: #2563eb !important; color: white !important; }
+          #invoice-print table tfoot tr { background-color: #2563eb !important; color: white !important; }
+          #invoice-print table thead th, #invoice-print table tfoot td { color: white !important; }
+          /* Page setup */
+          @page { size: A4; margin: 15mm 20mm; }
+          /* Avoid breaks inside items */
+          #invoice-print table tr { page-break-inside: avoid; }
         }
       `}</style>
     </div>

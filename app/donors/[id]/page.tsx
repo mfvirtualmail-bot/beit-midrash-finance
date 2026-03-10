@@ -2,11 +2,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
-import { Donor } from '@/lib/db'
+import { Donor, Collector } from '@/lib/db'
 import { formatHebrewDate } from '@/lib/hebrewDate'
 import { ArrowRight, Plus, Trash2, Heart } from 'lucide-react'
 
-interface Donation { id: number; donor_id: number; amount: number; date: string; description: string | null; notes: string | null }
+interface Donation { id: number; donor_id: number; amount: number; date: string; description: string | null; notes: string | null; collector_id: number | null; collector_name?: string | null; collector_commission?: number | null }
 interface DonorDetail extends Donor { donations: Donation[]; total_donated: number }
 
 export default function DonorDetailPage() {
@@ -16,8 +16,9 @@ export default function DonorDetailPage() {
   const [donor, setDonor] = useState<DonorDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
-  const [newDonation, setNewDonation] = useState({ amount: '', date: new Date().toISOString().split('T')[0], description: '', notes: '' })
+  const [newDonation, setNewDonation] = useState({ amount: '', date: new Date().toISOString().split('T')[0], description: '', notes: '', collector_id: '' as string })
   const [saving, setSaving] = useState(false)
+  const [collectors, setCollectors] = useState<Collector[]>([])
 
   async function load() {
     setLoading(true)
@@ -26,7 +27,10 @@ export default function DonorDetailPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [params.id])
+  useEffect(() => {
+    load()
+    fetch('/api/collectors').then(r => r.json()).then(setCollectors)
+  }, [params.id])
 
   async function handleAddDonation() {
     if (!newDonation.amount || !newDonation.date) return
@@ -38,7 +42,7 @@ export default function DonorDetailPage() {
     })
     setSaving(false)
     setShowAdd(false)
-    setNewDonation({ amount: '', date: new Date().toISOString().split('T')[0], description: '', notes: '' })
+    setNewDonation({ amount: '', date: new Date().toISOString().split('T')[0], description: '', notes: '', collector_id: '' })
     load()
   }
 
@@ -119,10 +123,20 @@ export default function DonorDetailPage() {
                 <input type="date" className="input w-full" value={newDonation.date}
                   onChange={e => setNewDonation(p => ({ ...p, date: e.target.value }))} />
               </div>
-              <div className="col-span-2">
+              <div>
                 <label className="label">{T.description}</label>
                 <input className="input w-full" value={newDonation.description}
                   onChange={e => setNewDonation(p => ({ ...p, description: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">{T.collector}</label>
+                <select className="input w-full" value={newDonation.collector_id}
+                  onChange={e => setNewDonation(p => ({ ...p, collector_id: e.target.value }))}>
+                  <option value="">—</option>
+                  {collectors.filter(c => c.active).map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.commission_percent}%)</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -143,7 +157,9 @@ export default function DonorDetailPage() {
                 <th className="text-start py-2 px-3 font-semibold text-gray-600">{T.date}</th>
                 <th className="text-start py-2 px-3 font-semibold text-gray-600">{T.hebrewDate}</th>
                 <th className="text-start py-2 px-3 font-semibold text-gray-600 hidden sm:table-cell">{T.description}</th>
+                <th className="text-start py-2 px-3 font-semibold text-gray-600 hidden md:table-cell">{T.collector}</th>
                 <th className="text-end py-2 px-3 font-semibold text-gray-600">{T.amount}</th>
+                <th className="text-end py-2 px-3 font-semibold text-gray-600 hidden sm:table-cell">{T.commission}</th>
                 <th className="py-2 px-3"></th>
               </tr>
             </thead>
@@ -153,7 +169,11 @@ export default function DonorDetailPage() {
                   <td className="py-3 px-3 text-gray-600">{d.date}</td>
                   <td className="py-3 px-3 text-gray-500 text-xs" dir="rtl">{formatHebrewDate(d.date, 'he')}</td>
                   <td className="py-3 px-3 text-gray-600 hidden sm:table-cell">{d.description || '—'}</td>
+                  <td className="py-3 px-3 text-gray-600 hidden md:table-cell">{d.collector_name || '—'}</td>
                   <td className="py-3 px-3 text-end font-semibold text-green-600">{fmt(Number(d.amount))}</td>
+                  <td className="py-3 px-3 text-end text-orange-600 hidden sm:table-cell">
+                    {d.collector_commission ? fmt(d.collector_commission) : '—'}
+                  </td>
                   <td className="py-3 px-3 text-end">
                     <button onClick={() => handleDeleteDonation(d.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
                       <Trash2 size={14} />

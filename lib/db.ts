@@ -119,6 +119,20 @@ export interface InvoiceItem {
   amount: number
 }
 
+// Collectors (agents)
+export interface Collector {
+  id: number
+  name: string
+  phone: string | null
+  email: string | null
+  commission_percent: number
+  active: boolean
+  notes: string | null
+  created_at: string
+  total_collected?: number
+  total_commission?: number
+}
+
 // Recurring Transactions
 export type RecurringFrequency = 'weekly' | 'monthly' | 'yearly' | 'hebrew_monthly'
 

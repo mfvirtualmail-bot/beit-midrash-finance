@@ -57,6 +57,49 @@ const HEBREW_DIGITS: Record<number, string> = {
   24:'כד', 25:'כה', 26:'כו', 27:'כז', 28:'כח', 29:'כט', 30:'ל',
 }
 
+// Proper Hebrew year gematria (omits the thousands, e.g., 5786 → תשפ״ו)
+const GEMATRIA_HUNDREDS: Record<number, string> = { 1:'ק', 2:'ר', 3:'ש', 4:'ת' }
+const GEMATRIA_TENS: Record<number, string> = { 1:'י', 2:'כ', 3:'ל', 4:'מ', 5:'נ', 6:'ס', 7:'ע', 8:'פ', 9:'צ' }
+const GEMATRIA_ONES: Record<number, string> = { 1:'א', 2:'ב', 3:'ג', 4:'ד', 5:'ה', 6:'ו', 7:'ז', 8:'ח', 9:'ט' }
+
+function yearToGematriya(year: number): string {
+  // Remove thousands (5786 → 786)
+  const shortYear = year % 1000
+  const h = Math.floor(shortYear / 100)
+  const t = Math.floor((shortYear % 100) / 10)
+  const o = shortYear % 10
+
+  let result = ''
+  // Handle 400+ (ת can repeat: 500=תק, 600=תר, 700=תש, 800=תת)
+  if (h >= 4) {
+    const fours = Math.floor(h / 4)
+    const remainder = h % 4
+    for (let i = 0; i < fours; i++) result += 'ת'
+    if (remainder > 0) result += GEMATRIA_HUNDREDS[remainder]
+  } else if (h > 0) {
+    result += GEMATRIA_HUNDREDS[h]
+  }
+
+  // Special cases: 15 = טו, 16 = טז
+  if (t === 1 && o === 5) {
+    result += 'טו'
+  } else if (t === 1 && o === 6) {
+    result += 'טז'
+  } else {
+    if (t > 0) result += GEMATRIA_TENS[t]
+    if (o > 0) result += GEMATRIA_ONES[o]
+  }
+
+  // Add geresh/gershayim
+  if (result.length === 1) {
+    result += '׳'
+  } else if (result.length > 1) {
+    result = result.slice(0, -1) + '״' + result.slice(-1)
+  }
+
+  return result
+}
+
 // Convert YYYY-MM-DD to HDate
 export function toHDate(gregorianDateStr: string): HDate {
   const [y, m, d] = gregorianDateStr.split('-').map(Number)
@@ -69,7 +112,7 @@ export function formatHebrewDate(gregorianDateStr: string, lang: 'he' | 'en' = '
     const hd = toHDate(gregorianDateStr)
     const day = HEBREW_DIGITS[hd.getDate()] ?? String(hd.getDate())
     const monthNum = hd.getMonth()
-    const yearStr = hd.renderGematriya ? hd.renderGematriya().split(' ').pop() ?? String(hd.getFullYear()) : String(hd.getFullYear())
+    const yearStr = yearToGematriya(hd.getFullYear())
     if (lang === 'he') {
       return `${day} ${MONTH_HE[monthNum] ?? ''} ${yearStr}`
     }
@@ -120,13 +163,7 @@ export function hebrewMonthToGregorianRange(hebrewMonth: number, hebrewYear: num
 
 // Get the Hebrew year as gematria string (e.g. "תשפ״ה")
 export function hebrewYearStr(hd: HDate): string {
-  try {
-    if (typeof (hd as HDate & { renderGematriya?: () => string }).renderGematriya === 'function') {
-      const parts = (hd as HDate & { renderGematriya: () => string }).renderGematriya().split(' ')
-      return parts[parts.length - 1]
-    }
-  } catch {}
-  return String(hd.getFullYear())
+  return yearToGematriya(hd.getFullYear())
 }
 
 // Get Shabbat parasha name or Holiday name for the week containing sundayDateStr
