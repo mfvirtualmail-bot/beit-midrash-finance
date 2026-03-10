@@ -75,7 +75,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{T.dashboard}</h1>
+      <div className="flex items-center gap-3">
+        <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
+        <h1 className="text-2xl font-bold text-gray-900">{T.dashboard}</h1>
+      </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

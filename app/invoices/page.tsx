@@ -27,6 +27,21 @@ export default function InvoicesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Omit<Partial<Invoice>, 'items'> & { items?: Item[] }>({})
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+
+  function toggleSelect(id: number) {
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+  function toggleSelectAll() {
+    setSelected(prev => prev.size === invoices.length ? new Set() : new Set(invoices.map(i => i.id)))
+  }
+  async function deleteSelected() {
+    if (!confirm(T.confirmDelete)) return
+    await Promise.all(Array.from(selected).map(id => fetch(`/api/invoices/${id}`, { method: 'DELETE' })))
+    setSelected(new Set())
+    load()
+  }
+
   // Auto-generate state
   const [showGenModal, setShowGenModal] = useState(false)
   const [genDateFrom, setGenDateFrom] = useState(() => {
@@ -157,6 +172,23 @@ export default function InvoicesPage() {
           ))}
         </div>
 
+        {/* Batch action bar */}
+        {selected.size > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-800">
+              {selected.size} {lang === 'he' ? 'נבחרו' : 'selected'}
+            </span>
+            <div className="flex gap-2">
+              <button onClick={deleteSelected} className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-medium">
+                <Trash2 size={14} /> {T.delete}
+              </button>
+              <button onClick={() => setSelected(new Set())} className="text-sm px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg">
+                {T.cancel}
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-8 text-gray-400">{T.loading}</div>
         ) : invoices.length === 0 ? (
@@ -166,6 +198,9 @@ export default function InvoicesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
+                  <th className="px-2 py-2 w-10">
+                    <input type="checkbox" checked={selected.size === invoices.length && invoices.length > 0} onChange={toggleSelectAll} className="rounded" />
+                  </th>
                   <th className="text-start py-2 px-3 font-semibold text-gray-600">{T.invoiceNumber}</th>
                   <th className="text-start py-2 px-3 font-semibold text-gray-600">{T.date}</th>
                   <th className="text-start py-2 px-3 font-semibold text-gray-600 hidden sm:table-cell">{T.hebrewDate}</th>
@@ -178,7 +213,10 @@ export default function InvoicesPage() {
               </thead>
               <tbody>
                 {invoices.map(inv => (
-                  <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <tr key={inv.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${selected.has(inv.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-2 py-3">
+                      <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggleSelect(inv.id)} className="rounded" />
+                    </td>
                     <td className="py-3 px-3 text-gray-500 font-mono text-xs">{inv.number || `#${inv.id}`}</td>
                     <td className="py-3 px-3 text-gray-600">{inv.date}</td>
                     <td className="py-3 px-3 text-gray-500 text-xs hidden sm:table-cell" dir="rtl">{formatHebrewDate(inv.date, 'he')}</td>

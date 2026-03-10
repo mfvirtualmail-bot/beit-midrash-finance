@@ -186,14 +186,186 @@ It contains project context, architecture notes, and a running log of all develo
 
 ---
 
-### Session 4 — 2026-03-09 (Today, current session)
+### Session 4 — 2026-03-09
 
 **What was done:**
 - Analyzed full codebase and produced overview (tech stack, architecture, entry points)
 - Created this `CLAUDE.md` file for persistent session logging
 - Reconstructed previous session history from git log
 
-**Status:** Ready for new feature development. User has more features and changes planned.
+---
+
+### Session 5 — 2026-03-09 → 2026-03-10
+
+**Branch:** `claude/explain-codebase-mmjlcou6tgfd23su-fnzDp` (merged to main via PR #1)
+
+**What was built (commit `94a38b3`):**
+- **Single-input fields fix** — replaced dual-language input fields (Hebrew + English side by side) with single input fields throughout the app. Before this, forms had two inputs for every text field (one Hebrew, one English), which was confusing. Now each field is a single input.
+
+**What was built (commit `6390233`):**
+- **Hebrew Calendar page** — new `/hebrew-calendar` page showing the Hebrew calendar
+- **Improved purchases week selector** — better week navigation in the purchases page
+
+**PR #1 created and merged** — merged `claude/explain-codebase-mmjlcou6tgfd23su-fnzDp` into `main`
+
+---
+
+### Session 6 — 2026-03-10
+
+**Branch:** `claude/explain-date-codebase-3glPM`
+
+**What was built (commit `6e9b8d9`):**
+
+1. **Collectors/Agents module** — Full new module for managing donation collectors (גבאי/סוכן):
+   - New page: `/collectors` — list, add, edit, delete collectors
+   - New API routes: `/api/collectors` (GET, POST), `/api/collectors/[id]` (GET, PUT, DELETE)
+   - New DB table: `collectors` (name, phone, email, commission_percent, notes, active, timestamps)
+   - DB migration added to `/api/admin/migrate` (v3 migration)
+   - New types in `lib/db.ts`: `Collector` interface
+   - Collectors can be assigned to donations — donor detail page (`/donors/[id]`) updated with collector dropdown
+   - Commission % displayed on donations
+   - i18n strings added for collectors in Hebrew and English
+
+2. **Clean PDF/Print invoices** — Print CSS improvements in `app/layout.tsx`:
+   - Added `@media print` styles for clean A4 output
+   - Hides navigation, buttons, non-essential UI when printing
+   - Forces color printing (`-webkit-print-color-adjust: exact`, `print-color-adjust: exact`)
+   - Invoice page gets full width when printed
+
+3. **Removed quantity from invoices** — Simplified invoice line items:
+   - Invoice detail page (`/invoices/[id]`) no longer shows quantity or unit price columns
+   - Just shows description + amount per line item
+   - Invoice creation form also simplified (no quantity/unit_price inputs)
+
+4. **Parasha labels in auto-generated invoices** — When invoices are auto-generated via `/api/invoices/generate`:
+   - Purchase transactions now include the Shabbat parasha name in their description
+   - Uses `getWeekLabel()` from `lib/hebrewDate.ts` to get parasha for the purchase date
+   - Format: "Purchase: CategoryName (פרשת ...)"
+
+5. **Hebrew year gematria fix** — Fixed `lib/hebrewDate.ts`:
+   - Previous implementation used `HDate.renderGematriya()` and tried to parse it — was buggy
+   - New implementation: custom `numberToHebrewYear()` function that directly converts year numbers to Hebrew gematria
+   - Handles hundreds (ק-תת), tens (י-צ), ones (א-ט), and special cases (טו→ט״ו, טז→ט״ז)
+   - Strips the thousands (5000) since Hebrew calendar years omit the millennium
+   - Added proper geresh (׳) and gershayim (״) punctuation
+
+**Files changed:**
+- `app/api/admin/migrate/route.ts` — added v3 migration for collectors table
+- `app/api/collectors/route.ts` — NEW: GET/POST for collectors
+- `app/api/collectors/[id]/route.ts` — NEW: GET/PUT/DELETE for single collector
+- `app/api/donors/[id]/donations/route.ts` — added collector_id to donation creation
+- `app/api/donors/[id]/route.ts` — added collector info to donor detail response
+- `app/api/invoices/generate/route.ts` — added parasha labels to purchase descriptions
+- `app/collectors/page.tsx` — NEW: full collectors management page
+- `app/donors/[id]/page.tsx` — added collector dropdown to donation form
+- `app/invoices/[id]/page.tsx` — removed quantity/unit_price, simplified display
+- `app/invoices/page.tsx` — simplified invoice creation form
+- `app/layout.tsx` — added print CSS for clean PDF output
+- `lib/db.ts` — added Collector type
+- `lib/hebrewDate.ts` — rewrote Hebrew year conversion, added numberToHebrewYear()
+- `lib/i18n.ts` — added collector-related i18n strings
+- `supabase-schema.sql` — added collectors table definition + v3 migration comment
+
+**Deployment status:**
+- Code is pushed to GitHub on branch `claude/explain-date-codebase-3glPM`
+- Attempted to merge to `main` for Vercel deploy but got 403 (branch protection or permission issue)
+- Local `main` branch was fast-forward merged but push was rejected
+- **User needs to manually merge to `main`** via GitHub PR to trigger Vercel deployment
+- **After deploy:** run `POST /api/admin/migrate` to create the `collectors` table in Supabase
+
+**Current git state:**
+- On branch `claude/explain-date-codebase-3glPM` (up to date with origin)
+- Local `main` is at `6e9b8d9` (same as feature branch) but couldn't push
+- 1 commit ahead of remote `main`: `6e9b8d9`
+
+**What the user asked at end of session:**
+- "Push the code on GitHub and on the server" — code is on GitHub (feature branch), but can't push to main directly. User needs to merge PR or push to main themselves.
+
+---
+
+## App Modules / Pages (Updated)
+
+| Route | Description |
+|---|---|
+| `/collectors` | **NEW** — Collector/agent list — manage donation collectors with commission % |
+
+## API Routes (Updated)
+
+```
+/api/collectors         GET, POST — list/create collectors
+/api/collectors/[id]    GET, PUT, DELETE — single collector CRUD
+```
+
+## Database Tables (Updated)
+
+### collectors (NEW — v3 migration)
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | PK, auto-generated |
+| name | text | NOT NULL |
+| phone | text | nullable |
+| email | text | nullable |
+| commission_percent | numeric(5,2) | default 0 |
+| notes | text | nullable |
+| active | boolean | default true |
+| created_at | timestamptz | auto |
+| updated_at | timestamptz | auto |
+
+---
+
+### Session 7 — 2026-03-10 (current)
+
+**Branch:** `claude/explain-date-codebase-3glPM` (continuing from session 6)
+
+**User requested 7 features/changes:**
+
+1. **Organization logo everywhere** — User attached logo image (בית המדרש תולדות יעקב יוסף דחסידי סקווירא אמסטרדם יצ"ו). Add to: login page, dashboard/main page, invoices, and all other prominent places. Save as `public/logo.png`.
+
+2. **Remove nikud (נקודות) from parasha names** — Currently parasha names show with vowel marks: פָּרָשַׁת כִּי תִשָּׂא (שַׁבַּת פָּרָה). Strip all nikud to show plain: פרשת כי תשא (שבת פרה). Fix in `lib/hebrewDate.ts` — add a stripNikud function that removes Unicode range \u0591-\u05C7 from strings returned by hebcal.
+
+3. **Excel import for bulk purchases** — New page/feature: upload an Excel (.xlsx) file to import purchases for many members at once. Similar to existing `/members/import` CSV import but for purchases. Needs: new page `/purchases/import`, new API route `/api/purchases/import` (POST), Excel parsing with `xlsx` package (already in project), mapping columns to member + category + amount + date.
+
+4. **Checklist / multi-select on all lists** — Add checkboxes to all list pages (purchases, members, transactions, donors, collectors, invoices). When items are selected, show a toolbar/action bar with batch operations: delete selected, edit selected (where applicable). Affects: `/transactions`, `/purchases`, `/members`, `/donors`, `/collectors`, `/invoices`.
+
+5. **Monthly fee — choose which month** — The "charge all members monthly fee" feature (`/api/members/monthly-fee`) currently charges for the current month. Add a dropdown to select which month to charge for (including previous months, e.g. last 12 months). The dropdown should show Hebrew month names. The charge description should include which month it's for.
+
+6. **Hebrew calendar always in Hebrew** — The `/hebrew-calendar` page should always render in Hebrew (month names, day names, parasha names) regardless of the app's current language setting. Force `he` locale for all calendar display elements.
+
+7. **PDF invoices** — Generate actual downloadable PDF files for invoices. Options: use a library like `jspdf` or `@react-pdf/renderer` or server-side PDF generation. Should produce a clean A4 PDF with: organization logo, organization details from settings, invoice number, date, line items, total, Hebrew text support (RTL).
+
+**All 7 features built and committed (commit `d7077f8`).**
+
+**What was built:**
+
+1. **Logo** — `<img src="/logo.png">` added to: `app/login/page.tsx` (login form header), `app/page.tsx` (dashboard header), `app/layout.tsx` (sidebar/header nav), `app/invoices/[id]/page.tsx` (invoice detail header). **User must place their logo image at `public/logo.png`** — the code references this file but I couldn't save the image from the conversation.
+
+2. **Strip nikud** — Added `stripNikud()` function to `lib/hebrewDate.ts` (removes Unicode \u0591-\u05C7). Applied to all returns from `getShabbatOrHolidayLabel()`. Also applied in `app/calendar/page.tsx` to holiday event rendering.
+
+3. **Hebrew calendar always Hebrew** — `app/calendar/page.tsx`: forced day names to always use `DAY_NAMES_HE`, month names to always use `nameHe`, parasha/holiday labels to always show Hebrew. Gregorian dates in holidays sidebar forced to `he-IL` locale.
+
+4. **Monthly fee month selector** — `app/api/members/monthly-fee/route.ts`: GET accepts `?month=X&year=Y` query params, returns `availableMonths` array (current + previous Hebrew year). POST accepts `{ month, year }` in body. `app/members/page.tsx`: added month dropdown in fee modal, loads available months from API, updates preview when month changes.
+
+5. **Multi-select checkboxes** — Added to 5 list pages: `app/transactions/page.tsx`, `app/members/page.tsx`, `app/donors/page.tsx`, `app/collectors/page.tsx`, `app/invoices/page.tsx`. Each has: select-all checkbox in header, per-row checkbox, batch action bar (shows count + delete button when items selected), blue highlight on selected rows.
+
+6. **Excel import for bulk purchases** — New files:
+   - `app/api/purchases/import/route.ts` — POST endpoint, parses xlsx/xls/csv, matches member names to existing members in DB, creates expense transactions
+   - `app/purchases/import/page.tsx` — drag-and-drop upload page with instructions table
+   - `app/purchases/page.tsx` — added "Import from Excel" button linking to import page
+   - Expected columns: member (required), amount (required), category, date, notes
+
+7. **PDF invoices** — `app/api/invoices/pdf/route.ts`: GET endpoint (`/api/invoices/pdf?id=X`) returns complete HTML page with RTL Hebrew layout, organization logo, settings-based org details, line items table, print-optimized CSS with `@page` A4 setup. Opens in new tab with "Print/Download PDF" button. `app/invoices/[id]/page.tsx`: "Download PDF" button now opens this endpoint instead of calling `window.print()`.
+
+**Files changed/created:**
+- Modified: `lib/hebrewDate.ts`, `app/layout.tsx`, `app/login/page.tsx`, `app/page.tsx`, `app/calendar/page.tsx`, `app/transactions/page.tsx`, `app/members/page.tsx`, `app/donors/page.tsx`, `app/collectors/page.tsx`, `app/invoices/page.tsx`, `app/invoices/[id]/page.tsx`, `app/purchases/page.tsx`, `app/api/members/monthly-fee/route.ts`, `package.json`, `package-lock.json`
+- Created: `app/api/invoices/pdf/route.ts`, `app/api/purchases/import/route.ts`, `app/purchases/import/page.tsx`
+- Dependencies added: `jspdf` (installed but not actively used — PDF is done via HTML rendering instead)
+
+**IMPORTANT for deployment:**
+- User must place logo image file at `public/logo.png` before deploying
+- Need to merge branch `claude/explain-date-codebase-3glPM` to `main` for Vercel deploy
+- Run `POST /api/admin/migrate` after deploy (for collectors table from session 6)
+
+**Git state:** On branch `claude/explain-date-codebase-3glPM`, pushed to origin. 3 commits ahead of remote main.
 
 ---
 

@@ -83,9 +83,9 @@ export default function InvoiceDetailPage() {
               <Mail size={15} /> {T.sendEmail}
             </button>
           ) : null}
-          <button onClick={() => window.print()} className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium">
+          <a href={`/api/invoices/pdf?id=${params.id}`} target="_blank" className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium">
             <Download size={15} /> {T.downloadPDF}
-          </button>
+          </a>
           <button onClick={() => window.print()} className="btn-primary flex items-center gap-2">
             <Printer size={16} /> {T.printInvoice}
           </button>
@@ -102,7 +102,10 @@ export default function InvoiceDetailPage() {
         <div className="border-b-4 border-blue-600 p-8 pb-6">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <div className="text-2xl font-bold text-blue-700 flex items-center gap-2">🕍 {orgName}</div>
+              <div className="text-2xl font-bold text-blue-700 flex items-center gap-2">
+                <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain" />
+                {orgName}
+              </div>
               {settings?.org_address && (
                 <div className="text-gray-500 text-sm mt-1">{settings.org_address}</div>
               )}
