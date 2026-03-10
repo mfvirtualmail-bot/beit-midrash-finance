@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
           return `${MONTH_HE[hd.getMonth()] ?? ''} ${hebrewYearStr(hd)}`
         })()
 
-    // Get members
-    let membersQuery = supabase.from('members').select('id, name, email').eq('active', 1)
+    // Get members — use .eq('active', true) (boolean)
+    let membersQuery = supabase.from('members').select('id, name, email').eq('active', true)
     if (member_ids && member_ids.length > 0) {
       membersQuery = membersQuery.in('id', member_ids)
     }
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     const memberIds = members.map((m: { id: number }) => m.id)
 
-    // Get all charges in range for these members (includes monthly membership fees)
+    // Get all charges in range (monthly membership fees)
     const { data: allCharges } = await supabase
       .from('member_charges')
       .select('*')
@@ -71,16 +71,16 @@ export async function POST(req: NextRequest) {
       .lte('date', date_to)
       .in('member_id', memberIds)
 
-    // Get all purchase transactions with member_id in range
-    const { data: allPurchases } = await supabase
+    // Get expense transactions linked to members in range
+    const { data: allExpenses } = await supabase
       .from('transactions')
       .select('*, categories(name_he)')
       .eq('type', 'expense')
       .gte('date', date_from)
       .lte('date', date_to)
-      .in('member_id', memberIds)
+      .not('member_id', 'is', null)
 
-    // Also get purchase-type transactions (type=purchase) in range
+    // Get purchase-type transactions in range
     const { data: allPurchaseType } = await supabase
       .from('transactions')
       .select('*, categories(name_he)')
@@ -88,8 +88,7 @@ export async function POST(req: NextRequest) {
       .gte('date', date_from)
       .lte('date', date_to)
 
-    // Build a map: purchases keyed by notes containing member name (for non-member-linked purchases)
-    const allPurchaseTxns = [...(allPurchases ?? []), ...(allPurchaseType ?? [])]
+    const allPurchaseTxns = [...(allExpenses ?? []), ...(allPurchaseType ?? [])]
 
     const createdInvoices = []
 
@@ -97,7 +96,6 @@ export async function POST(req: NextRequest) {
       const memberCharges = (allCharges ?? []).filter(
         (c: { member_id: number }) => c.member_id === member.id
       )
-      // Purchases linked by member_id OR by notes containing member name
       const memberPurchases = allPurchaseTxns.filter(
         (p: { member_id: number | null; notes: string | null }) =>
           p.member_id === member.id ||
@@ -106,8 +104,41 @@ export async function POST(req: NextRequest) {
 
       if (memberCharges.length === 0 && memberPurchases.length === 0) continue
 
+      // Build items: description_he = "period - item" so display layer can parse
+      const chargeItems = memberCharges.map((charge: { description: string; amount: number }) => {
+        // e.g., "דמי חבר - כסלו תשפ״ו" → period="כסלו תשפ״ו", item="דמי חבר"
+        const parts = charge.description.split(' - ')
+        const period = parts.length > 1 ? parts.slice(1).join(' - ') : ''
+        const itemName = parts[0] || charge.description
+        return {
+          description_he: period ? `${period} - ${itemName}` : itemName,
+          description_en: period ? `${period} - ${itemName}` : itemName,
+          quantity: 1,
+          unit_price: Number(charge.amount),
+          amount: Number(charge.amount),
+        }
+      })
+
+      const purchaseItems = memberPurchases.map((p: { description_he: string | null; amount: number; date: string; categories?: { name_he: string } | null }) => {
+        const sundayStr = getWeekSunday(p.date)
+        const weekLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
+        const baseName = p.categories?.name_he ?? (p.description_he ?? 'רכישה')
+        const descHe = weekLabel ? `${weekLabel} - ${baseName}` : baseName
+        return {
+          description_he: descHe,
+          description_en: descHe,
+          quantity: 1,
+          unit_price: Number(p.amount),
+          amount: Number(p.amount),
+        }
+      })
+
+      const allItems = [...chargeItems, ...purchaseItems]
+      const total = allItems.reduce((s, i) => s + Number(i.amount), 0)
+
       const invoiceTitle = `חשבון - ${member.name} - ${periodLabel}`
       const todayStr = new Date().toISOString().split('T')[0]
+
       const { data: invoice, error: invError } = await supabase
         .from('invoices')
         .insert({
@@ -124,45 +155,22 @@ export async function POST(req: NextRequest) {
 
       if (invError || !invoice) continue
 
-      // Monthly fees / charges → period is the month description
-      const chargeItems = memberCharges.map((charge: { description: string; amount: number; date: string }) => {
-        // Extract period from charge description (e.g., "דמי חבר - כסלו תשפ״ו" → "כסלו תשפ״ו")
-        const parts = charge.description.split(' - ')
-        const period = parts.length > 1 ? parts.slice(1).join(' - ') : ''
-        const itemName = parts[0] || charge.description
-        return {
-          invoice_id: (invoice as { id: number }).id,
-          description_he: itemName,
-          description_en: itemName,
-          period: period,
-          quantity: 1,
-          unit_price: Number(charge.amount),
-          amount: Number(charge.amount),
-        }
-      })
-
-      // Purchases → period is the week/parasha label
-      const purchaseItems = memberPurchases.map((p: { description_he: string | null; amount: number; date: string; categories?: { name_he: string } | null }) => {
-        const sundayStr = getWeekSunday(p.date)
-        const weekLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
-        const baseName = p.categories?.name_he ?? (p.description_he ?? 'רכישה')
-        return {
-          invoice_id: (invoice as { id: number }).id,
-          description_he: baseName,
-          description_en: baseName,
-          period: weekLabel || '',
-          quantity: 1,
-          unit_price: Number(p.amount),
-          amount: Number(p.amount),
-        }
-      })
-
-      const allItems = [...chargeItems, ...purchaseItems]
+      // Insert items WITHOUT the period column (may not exist in DB yet)
       if (allItems.length > 0) {
-        await supabase.from('invoice_items').insert(allItems)
+        const rows = allItems.map(item => ({
+          invoice_id: (invoice as { id: number }).id,
+          description_he: item.description_he,
+          description_en: item.description_en,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          amount: item.amount,
+        }))
+        const { error: itemsErr } = await supabase.from('invoice_items').insert(rows)
+        if (itemsErr) {
+          console.error(`Invoice items insert error for member ${member.name}:`, itemsErr.message)
+        }
       }
 
-      const total = allItems.reduce((s: number, i: { amount: number }) => s + Number(i.amount), 0)
       createdInvoices.push({
         id: (invoice as { id: number }).id,
         member: member.name,
