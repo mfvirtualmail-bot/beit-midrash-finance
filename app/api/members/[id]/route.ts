@@ -10,16 +10,29 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       .select('*, users:created_by(display_name)').eq('member_id', params.id).order('date', { ascending: false })
     const { data: payments } = await supabase.from('member_payments')
       .select('*, users:created_by(display_name)').eq('member_id', params.id).order('date', { ascending: false })
+    // Also get purchase/expense transactions linked to this member
+    const { data: purchases } = await supabase.from('transactions')
+      .select('*, categories(name_he, name_en)')
+      .eq('member_id', params.id)
+      .in('type', ['expense', 'purchase'])
+      .order('date', { ascending: false })
 
     const tc = (charges ?? []).reduce((s, c) => s + Number(c.amount), 0)
+    const purchaseTotal = (purchases ?? []).reduce((s, p) => s + Number(p.amount), 0)
     const tp = (payments ?? []).reduce((s, p) => s + Number(p.amount), 0)
 
     const flatCharges = (charges ?? []).map(c => ({ ...c, created_by_name: (c.users as {display_name:string}|null)?.display_name ?? null, users: undefined }))
     const flatPayments = (payments ?? []).map(p => ({ ...p, created_by_name: (p.users as {display_name:string}|null)?.display_name ?? null, users: undefined }))
+    const flatPurchases = (purchases ?? []).map(p => ({
+      id: p.id, date: p.date, amount: Number(p.amount), type: p.type,
+      description: p.description_he || (p.categories as {name_he:string}|null)?.name_he || '',
+      category_name: (p.categories as {name_he:string}|null)?.name_he || '',
+      notes: p.notes,
+    }))
 
     return NextResponse.json({
-      member: { ...member, total_charges: tc, total_payments: tp, balance: tp - tc },
-      charges: flatCharges, payments: flatPayments,
+      member: { ...member, total_charges: tc + purchaseTotal, total_payments: tp, balance: tp - tc - purchaseTotal },
+      charges: flatCharges, payments: flatPayments, purchases: flatPurchases,
     })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
