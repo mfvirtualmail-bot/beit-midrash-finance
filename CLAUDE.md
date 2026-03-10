@@ -186,14 +186,130 @@ It contains project context, architecture notes, and a running log of all develo
 
 ---
 
-### Session 4 — 2026-03-09 (Today, current session)
+### Session 4 — 2026-03-09
 
 **What was done:**
 - Analyzed full codebase and produced overview (tech stack, architecture, entry points)
 - Created this `CLAUDE.md` file for persistent session logging
 - Reconstructed previous session history from git log
 
-**Status:** Ready for new feature development. User has more features and changes planned.
+---
+
+### Session 5 — 2026-03-09 → 2026-03-10
+
+**Branch:** `claude/explain-codebase-mmjlcou6tgfd23su-fnzDp` (merged to main via PR #1)
+
+**What was built (commit `94a38b3`):**
+- **Single-input fields fix** — replaced dual-language input fields (Hebrew + English side by side) with single input fields throughout the app. Before this, forms had two inputs for every text field (one Hebrew, one English), which was confusing. Now each field is a single input.
+
+**What was built (commit `6390233`):**
+- **Hebrew Calendar page** — new `/hebrew-calendar` page showing the Hebrew calendar
+- **Improved purchases week selector** — better week navigation in the purchases page
+
+**PR #1 created and merged** — merged `claude/explain-codebase-mmjlcou6tgfd23su-fnzDp` into `main`
+
+---
+
+### Session 6 — 2026-03-10
+
+**Branch:** `claude/explain-date-codebase-3glPM`
+
+**What was built (commit `6e9b8d9`):**
+
+1. **Collectors/Agents module** — Full new module for managing donation collectors (גבאי/סוכן):
+   - New page: `/collectors` — list, add, edit, delete collectors
+   - New API routes: `/api/collectors` (GET, POST), `/api/collectors/[id]` (GET, PUT, DELETE)
+   - New DB table: `collectors` (name, phone, email, commission_percent, notes, active, timestamps)
+   - DB migration added to `/api/admin/migrate` (v3 migration)
+   - New types in `lib/db.ts`: `Collector` interface
+   - Collectors can be assigned to donations — donor detail page (`/donors/[id]`) updated with collector dropdown
+   - Commission % displayed on donations
+   - i18n strings added for collectors in Hebrew and English
+
+2. **Clean PDF/Print invoices** — Print CSS improvements in `app/layout.tsx`:
+   - Added `@media print` styles for clean A4 output
+   - Hides navigation, buttons, non-essential UI when printing
+   - Forces color printing (`-webkit-print-color-adjust: exact`, `print-color-adjust: exact`)
+   - Invoice page gets full width when printed
+
+3. **Removed quantity from invoices** — Simplified invoice line items:
+   - Invoice detail page (`/invoices/[id]`) no longer shows quantity or unit price columns
+   - Just shows description + amount per line item
+   - Invoice creation form also simplified (no quantity/unit_price inputs)
+
+4. **Parasha labels in auto-generated invoices** — When invoices are auto-generated via `/api/invoices/generate`:
+   - Purchase transactions now include the Shabbat parasha name in their description
+   - Uses `getWeekLabel()` from `lib/hebrewDate.ts` to get parasha for the purchase date
+   - Format: "Purchase: CategoryName (פרשת ...)"
+
+5. **Hebrew year gematria fix** — Fixed `lib/hebrewDate.ts`:
+   - Previous implementation used `HDate.renderGematriya()` and tried to parse it — was buggy
+   - New implementation: custom `numberToHebrewYear()` function that directly converts year numbers to Hebrew gematria
+   - Handles hundreds (ק-תת), tens (י-צ), ones (א-ט), and special cases (טו→ט״ו, טז→ט״ז)
+   - Strips the thousands (5000) since Hebrew calendar years omit the millennium
+   - Added proper geresh (׳) and gershayim (״) punctuation
+
+**Files changed:**
+- `app/api/admin/migrate/route.ts` — added v3 migration for collectors table
+- `app/api/collectors/route.ts` — NEW: GET/POST for collectors
+- `app/api/collectors/[id]/route.ts` — NEW: GET/PUT/DELETE for single collector
+- `app/api/donors/[id]/donations/route.ts` — added collector_id to donation creation
+- `app/api/donors/[id]/route.ts` — added collector info to donor detail response
+- `app/api/invoices/generate/route.ts` — added parasha labels to purchase descriptions
+- `app/collectors/page.tsx` — NEW: full collectors management page
+- `app/donors/[id]/page.tsx` — added collector dropdown to donation form
+- `app/invoices/[id]/page.tsx` — removed quantity/unit_price, simplified display
+- `app/invoices/page.tsx` — simplified invoice creation form
+- `app/layout.tsx` — added print CSS for clean PDF output
+- `lib/db.ts` — added Collector type
+- `lib/hebrewDate.ts` — rewrote Hebrew year conversion, added numberToHebrewYear()
+- `lib/i18n.ts` — added collector-related i18n strings
+- `supabase-schema.sql` — added collectors table definition + v3 migration comment
+
+**Deployment status:**
+- Code is pushed to GitHub on branch `claude/explain-date-codebase-3glPM`
+- Attempted to merge to `main` for Vercel deploy but got 403 (branch protection or permission issue)
+- Local `main` branch was fast-forward merged but push was rejected
+- **User needs to manually merge to `main`** via GitHub PR to trigger Vercel deployment
+- **After deploy:** run `POST /api/admin/migrate` to create the `collectors` table in Supabase
+
+**Current git state:**
+- On branch `claude/explain-date-codebase-3glPM` (up to date with origin)
+- Local `main` is at `6e9b8d9` (same as feature branch) but couldn't push
+- 1 commit ahead of remote `main`: `6e9b8d9`
+
+**What the user asked at end of session:**
+- "Push the code on GitHub and on the server" — code is on GitHub (feature branch), but can't push to main directly. User needs to merge PR or push to main themselves.
+
+---
+
+## App Modules / Pages (Updated)
+
+| Route | Description |
+|---|---|
+| `/collectors` | **NEW** — Collector/agent list — manage donation collectors with commission % |
+
+## API Routes (Updated)
+
+```
+/api/collectors         GET, POST — list/create collectors
+/api/collectors/[id]    GET, PUT, DELETE — single collector CRUD
+```
+
+## Database Tables (Updated)
+
+### collectors (NEW — v3 migration)
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | PK, auto-generated |
+| name | text | NOT NULL |
+| phone | text | nullable |
+| email | text | nullable |
+| commission_percent | numeric(5,2) | default 0 |
+| notes | text | nullable |
+| active | boolean | default true |
+| created_at | timestamptz | auto |
+| updated_at | timestamptz | auto |
 
 ---
 
