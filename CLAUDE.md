@@ -369,4 +369,42 @@ It contains project context, architecture notes, and a running log of all develo
 
 ---
 
+### Session 8 — 2026-03-10
+
+**Branch:** `claude/explain-date-codebase-3glPM` (continuing)
+
+**Bugs fixed (2 commits: `17b64b3`, `f62c813`):**
+
+1. **Invoice generation returning 0 invoices** — Root cause: `members.active` column is `integer` (1/0), but `/api/invoices/generate/route.ts` used `.eq('active', true)` (boolean). PostgreSQL doesn't match `integer 1 = boolean true`, so the query returned **zero members** → zero invoices generated. Fixed to `.eq('active', 1)`.
+
+2. **Invoice purchase period labels always showing wrong parasha** — The invoice generation code was computing a new parasha label via `getShabbatOrHolidayLabel()` for every purchase, but it always returned the current week's parasha ("פרשת ויקהלפקודי שבת החדש") instead of the purchase's actual date. The fix: purchase transactions' `description_he` already contains the correct "period - item" format (e.g., "יום כיפור - כהן", "פרשת האזינו - שלישי"). Now the code uses this directly instead of overwriting it with a computed (wrong) label.
+
+3. **Member detail page not showing purchases** — `/api/members/[id]/route.ts` only returned `member_charges` and `member_payments`. Added query for `transactions` where `member_id` matches and `type IN ('expense', 'purchase')`. New `purchases` array returned in API response. Member detail page (`app/members/[id]/page.tsx`) now shows a "רכישות" (Purchases) section with orange-themed table between charges and payments.
+
+4. **No "generate invoice" button on members list page** — Added a purple FileText icon button per member row on `/members` page. Clicking navigates to `/members/[id]#invoice` which auto-opens the invoice generation modal.
+
+5. **Invoices list API error handling** — Added error logging to `/api/invoices/route.ts` GET handler. Previously errors were silently swallowed and returned empty array.
+
+6. **Added v5 migration: transactions 'purchase' type** — The `transactions` table CHECK constraint only allowed `('income', 'expense')`. Added migration to allow `'purchase'` type: `ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check; ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'purchase'));`
+
+**Files changed:**
+- `app/api/invoices/generate/route.ts` — fixed `.eq('active', 1)`, fixed purchase description to use existing description_he
+- `app/api/invoices/route.ts` — added error logging
+- `app/api/members/[id]/route.ts` — added purchases query, included in response
+- `app/members/[id]/page.tsx` — added purchases interface, purchases section UI, auto-open invoice modal on #invoice hash
+- `app/members/page.tsx` — added FileText icon, generate invoice button per member row
+- `app/api/admin/migrate/route.ts` — added v5 migration for transactions purchase type
+
+**SQL migrations added (v5):**
+```sql
+ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
+ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'purchase'));
+```
+
+**Known issue:** `members.active` column is `integer` (not `boolean`). All queries checking active status must use `.eq('active', 1)` not `.eq('active', true)`. The `donors`, `collectors`, `recurring_transactions` tables use `boolean` for active — those are fine with `.eq('active', true)`.
+
+**Git state:** On branch `claude/explain-date-codebase-3glPM`, pushed to origin. 5 commits ahead of remote main.
+
+---
+
 *This file is updated at the end of every session. Always read it at the start of a new session to restore context.*
