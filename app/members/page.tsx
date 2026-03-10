@@ -13,6 +13,8 @@ interface Member {
   address: string | null
   notes: string | null
   active: number
+  total_fees: number
+  total_purchases: number
   total_charges: number
   total_payments: number
   balance: number
@@ -240,9 +242,10 @@ export default function MembersPage() {
                 </th>
                 <th className="px-4 py-3 text-start">{T.name}</th>
                 <th className="px-4 py-3 text-start hidden sm:table-cell">{T.phone}</th>
-                <th className="px-4 py-3 text-end">{T.totalCharges}</th>
+                <th className="px-4 py-3 text-end hidden md:table-cell">{lang === 'he' ? 'דמי חבר' : 'Fees'}</th>
+                <th className="px-4 py-3 text-end hidden md:table-cell">{lang === 'he' ? 'רכישות' : 'Purchases'}</th>
                 <th className="px-4 py-3 text-end">{T.totalPayments}</th>
-                <th className="px-4 py-3 text-end">{T.balance}</th>
+                <th className="px-4 py-3 text-end">{lang === 'he' ? 'חוב' : 'Owed'}</th>
                 <th className="px-4 py-3 text-end"></th>
               </tr>
             </thead>
@@ -261,7 +264,8 @@ export default function MembersPage() {
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
                     {m.phone && <span className="flex items-center gap-1"><Phone size={12} />{m.phone}</span>}
                   </td>
-                  <td className="px-4 py-3 text-end text-red-600">{fmt(m.total_charges)}</td>
+                  <td className="px-4 py-3 text-end text-red-600 hidden md:table-cell">{fmt(m.total_fees)}</td>
+                  <td className="px-4 py-3 text-end text-orange-600 hidden md:table-cell">{fmt(m.total_purchases)}</td>
                   <td className="px-4 py-3 text-end text-green-600">{fmt(m.total_payments)}</td>
                   <td className="px-4 py-3 text-end font-semibold">
                     <span className={m.balance < 0 ? 'text-red-600' : m.balance > 0 ? 'text-green-600' : 'text-gray-500'}>

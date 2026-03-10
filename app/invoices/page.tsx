@@ -46,6 +46,7 @@ export default function InvoicesPage() {
   const [showGenModal, setShowGenModal] = useState(false)
   const hebrewYears = getRecentHebrewYears()
   const [genHebrewYear, setGenHebrewYear] = useState(getCurrentHebrewYear())
+  const [genMemberId, setGenMemberId] = useState<number | ''>('')
   const [genLoading, setGenLoading] = useState(false)
   const [genResult, setGenResult] = useState<{ count: number; invoices: { id: number; member: string; total: number; email: string | null }[] } | null>(null)
 
@@ -118,10 +119,12 @@ export default function InvoicesPage() {
   async function handleGenerate() {
     setGenLoading(true)
     const range = hebrewYearToGregorianRange(genHebrewYear)
+    const body: Record<string, unknown> = { date_from: range.start, date_to: range.end, hebrew_year: genHebrewYear }
+    if (genMemberId) body.member_ids = [genMemberId]
     const res = await fetch('/api/invoices/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: range.start, date_to: range.end, hebrew_year: genHebrewYear }),
+      body: JSON.stringify(body),
     })
     const data = await res.json()
     setGenResult(data)
@@ -316,16 +319,25 @@ export default function InvoicesPage() {
               <>
                 <p className="text-sm text-gray-600">
                   {lang === 'he'
-                    ? 'בחר שנה עברית. המערכת תיצור חשבונית לכל חבר שיש לו חיובים ורכישות בשנה זו.'
-                    : 'Select a Hebrew year. An invoice will be created for each member with charges and purchases in that year.'}
+                    ? 'בחר שנה עברית וחבר (אופציונלי). המערכת תיצור חשבונית לכל חבר שיש לו חיובים ורכישות.'
+                    : 'Select a Hebrew year and optionally a specific member.'}
                 </p>
-                <div>
-                  <label className="label">{lang === 'he' ? 'שנה עברית' : 'Hebrew Year'}</label>
-                  <select className="input w-full" value={genHebrewYear} onChange={e => setGenHebrewYear(Number(e.target.value))}>
-                    {hebrewYears.map(y => (
-                      <option key={y.year} value={y.year}>{y.label} ({y.year})</option>
-                    ))}
-                  </select>
+                <div className="space-y-3">
+                  <div>
+                    <label className="label">{lang === 'he' ? 'שנה עברית' : 'Hebrew Year'}</label>
+                    <select className="input w-full" value={genHebrewYear} onChange={e => setGenHebrewYear(Number(e.target.value))}>
+                      {hebrewYears.map(y => (
+                        <option key={y.year} value={y.year}>{y.label} ({y.year})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">{lang === 'he' ? 'חבר (אופציונלי)' : 'Member (optional)'}</label>
+                    <select className="input w-full" value={genMemberId} onChange={e => setGenMemberId(e.target.value ? Number(e.target.value) : '')}>
+                      <option value="">{lang === 'he' ? '— כל החברים —' : '— All Members —'}</option>
+                      {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div className="flex gap-3 justify-end pt-2">
                   <button className="btn-secondary" onClick={() => setShowGenModal(false)}>{T.cancel}</button>
@@ -335,7 +347,7 @@ export default function InvoicesPage() {
                     disabled={genLoading}
                   >
                     <Zap size={16} />
-                    {genLoading ? T.loading : (lang === 'he' ? 'הפק חשבוניות' : 'Generate Invoices')}
+                    {genLoading ? T.loading : (genMemberId ? (lang === 'he' ? 'הפק חשבונית' : 'Generate Invoice') : (lang === 'he' ? 'הפק לכל החברים' : 'Generate for All'))}
                   </button>
                 </div>
               </>
