@@ -14,6 +14,7 @@ interface MemberDetail {
   }
   charges: Array<{ id: number; description: string; amount: number; date: string; notes: string | null; created_by_name: string | null }>
   payments: Array<{ id: number; amount: number; date: string; method: string; reference: string | null; notes: string | null; created_by_name: string | null }>
+  purchases: Array<{ id: number; date: string; amount: number; type: string; description: string; category_name: string; notes: string | null }>
 }
 
 const TODAY = new Date().toISOString().slice(0, 10)
@@ -73,6 +74,14 @@ export default function MemberDetailPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Auto-open invoice modal if navigated with #invoice
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#invoice' && data) {
+      setGenResult(null)
+      setShowGenInvoice(true)
+    }
+  }, [data])
+
   async function addCharge(e: React.FormEvent) {
     e.preventDefault()
     setSavingCharge(true)
@@ -116,7 +125,7 @@ export default function MemberDetailPage() {
 
   if (loading) return <div className="p-8 text-center text-gray-400">{T.loading}</div>
   if (!data) return <div className="p-8 text-center text-red-500">{T.error}</div>
-  const { member, charges, payments } = data
+  const { member, charges, payments, purchases } = data
 
   return (
     <div className="space-y-6">
@@ -199,6 +208,39 @@ export default function MemberDetailPage() {
           </table>
         )}
       </div>
+
+      {/* Purchases section */}
+      {purchases && purchases.length > 0 && (
+        <div className="card p-0">
+          <div className="flex items-center justify-between p-4 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-700">{lang === 'he' ? 'רכישות' : 'Purchases'} ({purchases.length})</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+              <tr>
+                <th className="px-4 py-2 text-start">{T.date}</th>
+                <th className="px-4 py-2 text-start">{T.description}</th>
+                <th className="px-4 py-2 text-start hidden sm:table-cell">{T.notes}</th>
+                <th className="px-4 py-2 text-end">{T.amount}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {purchases.map(p => (
+                <tr key={p.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 text-gray-500 whitespace-nowrap">{p.date}</td>
+                  <td className="px-4 py-2 text-gray-800">{p.description || p.category_name}</td>
+                  <td className="px-4 py-2 text-gray-400 hidden sm:table-cell">{p.notes || '—'}</td>
+                  <td className="px-4 py-2 text-end font-medium text-orange-600">{fmt(p.amount)}</td>
+                </tr>
+              ))}
+              <tr className="bg-gray-50 font-semibold">
+                <td colSpan={3} className="px-4 py-2 text-gray-600">{T.total}</td>
+                <td className="px-4 py-2 text-end text-orange-600">{fmt(purchases.reduce((s, p) => s + p.amount, 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Payments section */}
       <div className="card p-0">

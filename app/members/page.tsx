@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle, FileText } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
 import Link from 'next/link'
 
@@ -276,6 +276,9 @@ export default function MembersPage() {
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => router.push(`/members/${m.id}`)} className="p-1.5 hover:bg-blue-100 text-blue-600 rounded-lg" title={T.memberDetails}>
                         <Eye size={15} />
+                      </button>
+                      <button onClick={() => router.push(`/members/${m.id}#invoice`)} className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg" title={lang === 'he' ? 'הפק חשבונית' : 'Generate Invoice'}>
+                        <FileText size={15} />
                       </button>
                       <button onClick={() => openEdit(m)} className="p-1.5 hover:bg-gray-100 text-gray-500 rounded-lg">
                         <Edit2 size={15} />

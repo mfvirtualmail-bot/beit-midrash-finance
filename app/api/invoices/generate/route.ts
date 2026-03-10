@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
           return `${MONTH_HE[hd.getMonth()] ?? ''} ${hebrewYearStr(hd)}`
         })()
 
-    // Get members — use .eq('active', true) (boolean)
-    let membersQuery = supabase.from('members').select('id, name, email').eq('active', true)
+    // Get active members (active column is integer: 1=active, 0=inactive)
+    let membersQuery = supabase.from('members').select('id, name, email').eq('active', 1)
     if (member_ids && member_ids.length > 0) {
       membersQuery = membersQuery.in('id', member_ids)
     }

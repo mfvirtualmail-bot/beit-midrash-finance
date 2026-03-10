@@ -9,7 +9,11 @@ export async function GET(req: NextRequest) {
       .select('*, members(name, email), donors(name_he)')
       .order('date', { ascending: false })
     if (status) q = q.eq('status', status)
-    const { data } = await q
+    const { data, error } = await q
+    if (error) {
+      console.error('Invoices fetch error:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     // Flatten and compute totals
     const ids = (data ?? []).map((inv: { id: number }) => inv.id)
     let itemsMap: Record<number, { amount: number }[]> = {}
