@@ -76,7 +76,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
+        <img src="/api/logo" alt="Logo" className="w-12 h-12 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
         <h1 className="text-2xl font-bold text-gray-900">{T.dashboard}</h1>
       </div>
 

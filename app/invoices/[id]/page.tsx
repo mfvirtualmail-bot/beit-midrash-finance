@@ -103,7 +103,7 @@ export default function InvoiceDetailPage() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <div className="text-2xl font-bold text-blue-700 flex items-center gap-2">
-                <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain" />
+                <img src="/api/logo" alt="Logo" className="w-16 h-16 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                 {orgName}
               </div>
               {settings?.org_address && (

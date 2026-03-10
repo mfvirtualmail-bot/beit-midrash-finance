@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2 } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon } from 'lucide-react'
 
 interface OrgSettings {
   org_name_he: string
@@ -33,13 +33,56 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(data => {
       if (data && !data.error) setForm({ ...DEFAULTS, ...data })
       setLoading(false)
     })
+    fetch('/api/settings/logo').then(r => r.json()).then(data => {
+      if (data?.logo) setLogoPreview(data.logo)
+    })
   }, [])
+
+  async function handleLogoUpload(file: File) {
+    if (!file.type.startsWith('image/')) {
+      setMsg({ type: 'err', text: lang === 'he' ? 'יש לבחור קובץ תמונה' : 'Please select an image file' })
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setMsg({ type: 'err', text: lang === 'he' ? 'הקובץ גדול מדי (מקסימום 2MB)' : 'File too large (max 2MB)' })
+      return
+    }
+    setLogoUploading(true)
+    setMsg(null)
+    const fd = new FormData()
+    fd.append('logo', file)
+    const res = await fetch('/api/settings/logo', { method: 'POST', body: fd })
+    if (res.ok) {
+      const reader = new FileReader()
+      reader.onload = () => setLogoPreview(reader.result as string)
+      reader.readAsDataURL(file)
+      setMsg({ type: 'ok', text: lang === 'he' ? 'הלוגו הועלה בהצלחה' : 'Logo uploaded successfully' })
+    } else {
+      const d = await res.json()
+      setMsg({ type: 'err', text: d.error ?? T.error })
+    }
+    setLogoUploading(false)
+    setTimeout(() => setMsg(null), 5000)
+  }
+
+  async function handleLogoDelete() {
+    if (!confirm(lang === 'he' ? 'למחוק את הלוגו?' : 'Delete logo?')) return
+    setLogoUploading(true)
+    await fetch('/api/settings/logo', { method: 'DELETE' })
+    setLogoPreview(null)
+    setLogoUploading(false)
+    setMsg({ type: 'ok', text: lang === 'he' ? 'הלוגו נמחק' : 'Logo deleted' })
+    setTimeout(() => setMsg(null), 5000)
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -81,6 +124,67 @@ export default function SettingsPage() {
           {msg.text}
         </div>
       )}
+
+      {/* Logo Upload */}
+      <div className="card space-y-4">
+        <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+          <ImageIcon size={16} className="text-purple-500" />
+          {lang === 'he' ? 'לוגו הארגון' : 'Organization Logo'}
+        </h2>
+        <div className="flex items-center gap-6">
+          <div className="w-28 h-28 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
+            {logoPreview ? (
+              <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <ImageIcon size={32} className="text-gray-300" />
+            )}
+          </div>
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              {lang === 'he'
+                ? 'העלה לוגו שיופיע בכניסה, בדף הראשי, בחשבוניות ובכל מקום בולט. (PNG, JPG — מקסימום 2MB)'
+                : 'Upload a logo to display on login, dashboard, invoices, and everywhere prominent. (PNG, JPG — max 2MB)'}
+            </p>
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (f) handleLogoUpload(f)
+                  e.target.value = ''
+                }}
+              />
+              <button
+                type="button"
+                disabled={logoUploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-50 border border-blue-300 text-blue-700 hover:bg-blue-100 rounded-xl font-medium disabled:opacity-50"
+              >
+                <Upload size={14} />
+                {logoUploading
+                  ? T.loading
+                  : logoPreview
+                    ? (lang === 'he' ? 'החלף לוגו' : 'Replace Logo')
+                    : (lang === 'he' ? 'העלה לוגו' : 'Upload Logo')}
+              </button>
+              {logoPreview && (
+                <button
+                  type="button"
+                  disabled={logoUploading}
+                  onClick={handleLogoDelete}
+                  className="flex items-center gap-2 text-sm px-4 py-2 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 rounded-xl font-medium disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                  {lang === 'he' ? 'מחק' : 'Delete'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Organization Details */}
