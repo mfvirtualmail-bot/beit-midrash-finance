@@ -22,14 +22,17 @@ export async function GET(req: NextRequest) {
     memberName = member?.name ?? ''
   }
 
-  // Get settings
-  const { data: settings } = await supabase.from('settings').select('*').single()
-  const orgName = settings?.org_name_he || 'בית המדרש'
-  const orgAddress = settings?.org_address || ''
-  const orgPhone = settings?.org_phone || ''
-  const orgEmail = settings?.org_email || ''
-  const headerText = settings?.invoice_header_he || ''
-  const footerText = settings?.invoice_footer_he || ''
+  // Get settings (key-value rows)
+  const { data: settingsRows } = await supabase.from('settings').select('key, value')
+  const settings: Record<string, string> = {}
+  for (const row of settingsRows ?? []) settings[row.key] = row.value ?? ''
+  const orgName = settings.org_name_he || 'בית המדרש'
+  const orgAddress = settings.org_address || ''
+  const orgPhone = settings.org_phone || ''
+  const orgEmail = settings.org_email || ''
+  const headerText = settings.invoice_header_he || ''
+  const footerText = settings.invoice_footer_he || ''
+  const logoDataUrl = settings.org_logo || ''
 
   const items = invoice.items ?? []
   const total = items.reduce((s: number, i: { amount: number }) => s + Number(i.amount), 0)
@@ -116,7 +119,7 @@ export async function GET(req: NextRequest) {
   <div class="header">
     <div class="org-info">
       <div class="org-name">
-        <img src="/logo.png" alt="Logo" class="org-logo" onerror="this.style.display='none'" />
+        ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Logo" class="org-logo" />` : ''}
         ${orgName}
       </div>
       ${orgAddress ? `<div class="org-details">${orgAddress}</div>` : ''}

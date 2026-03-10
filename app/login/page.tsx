@@ -38,7 +38,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Logo" className="w-28 h-28 mx-auto object-contain" />
+          <img src="/api/logo" alt="Logo" className="w-28 h-28 mx-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <h1 className="text-xl font-bold text-gray-800 mt-3">{T.appName}</h1>
           <p className="text-gray-500 text-sm mt-1">{T.loginTitle}</p>
         </div>
