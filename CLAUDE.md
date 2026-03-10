@@ -313,4 +313,38 @@ It contains project context, architecture notes, and a running log of all develo
 
 ---
 
+### Session 7 — 2026-03-10 (current)
+
+**Branch:** `claude/explain-date-codebase-3glPM` (continuing from session 6)
+
+**User requested 7 features/changes:**
+
+1. **Organization logo everywhere** — User attached logo image (בית המדרש תולדות יעקב יוסף דחסידי סקווירא אמסטרדם יצ"ו). Add to: login page, dashboard/main page, invoices, and all other prominent places. Save as `public/logo.png`.
+
+2. **Remove nikud (נקודות) from parasha names** — Currently parasha names show with vowel marks: פָּרָשַׁת כִּי תִשָּׂא (שַׁבַּת פָּרָה). Strip all nikud to show plain: פרשת כי תשא (שבת פרה). Fix in `lib/hebrewDate.ts` — add a stripNikud function that removes Unicode range \u0591-\u05C7 from strings returned by hebcal.
+
+3. **Excel import for bulk purchases** — New page/feature: upload an Excel (.xlsx) file to import purchases for many members at once. Similar to existing `/members/import` CSV import but for purchases. Needs: new page `/purchases/import`, new API route `/api/purchases/import` (POST), Excel parsing with `xlsx` package (already in project), mapping columns to member + category + amount + date.
+
+4. **Checklist / multi-select on all lists** — Add checkboxes to all list pages (purchases, members, transactions, donors, collectors, invoices). When items are selected, show a toolbar/action bar with batch operations: delete selected, edit selected (where applicable). Affects: `/transactions`, `/purchases`, `/members`, `/donors`, `/collectors`, `/invoices`.
+
+5. **Monthly fee — choose which month** — The "charge all members monthly fee" feature (`/api/members/monthly-fee`) currently charges for the current month. Add a dropdown to select which month to charge for (including previous months, e.g. last 12 months). The dropdown should show Hebrew month names. The charge description should include which month it's for.
+
+6. **Hebrew calendar always in Hebrew** — The `/hebrew-calendar` page should always render in Hebrew (month names, day names, parasha names) regardless of the app's current language setting. Force `he` locale for all calendar display elements.
+
+7. **PDF invoices** — Generate actual downloadable PDF files for invoices. Options: use a library like `jspdf` or `@react-pdf/renderer` or server-side PDF generation. Should produce a clean A4 PDF with: organization logo, organization details from settings, invoice number, date, line items, total, Hebrew text support (RTL).
+
+**Plan — build order:**
+1. Save logo image to `public/logo.png`
+2. Fix nikud stripping in `lib/hebrewDate.ts`
+3. Add logo to login, dashboard, layout/header, invoices
+4. Hebrew calendar always in Hebrew
+5. Monthly fee month selector dropdown
+6. Multi-select checkboxes on all list pages
+7. Excel import for bulk purchases
+8. PDF invoice generation
+
+**Status:** About to start building.
+
+---
+
 *This file is updated at the end of every session. Always read it at the start of a new session to restore context.*
