@@ -1,5 +1,10 @@
 import { HDate, months, HebrewCalendar, CalOptions, flags } from '@hebcal/core'
 
+// Strip nikud (Hebrew vowel marks) from a string
+export function stripNikud(str: string): string {
+  return str.replace(/[\u0591-\u05C7]/g, '')
+}
+
 export const HEBREW_MONTHS_HE = [
   'תשרי', 'חשוון', 'כסלו', 'טבת', 'שבט', 'אדר', 'אדר א׳', 'אדר ב׳',
   'ניסן', 'אייר', 'סיוון', 'תמוז', 'אב', 'אלול',
@@ -182,19 +187,22 @@ export function getShabbatOrHolidayLabel(sundayDateStr: string, lang: 'he' | 'en
 
     // Yom Tov takes priority
     const chag = events.find(e => e.getFlags() & flags.CHAG)
-    if (chag) return lang === 'he' ? (chag.renderBrief?.('he') ?? chag.render('he')) : (chag.renderBrief?.('en') ?? chag.render('en'))
+    if (chag) {
+      const raw = lang === 'he' ? (chag.renderBrief?.('he') ?? chag.render('he')) : (chag.renderBrief?.('en') ?? chag.render('en'))
+      return stripNikud(raw)
+    }
 
     // Special Shabbat (HaGadol, Shuva, etc.)
     const special = events.find(e => e.getFlags() & flags.SPECIAL_SHABBAT)
     const parasha = events.find(e => e.getFlags() & flags.PARSHA_HASHAVUA)
 
     if (parasha && special) {
-      const pName = parasha.render?.(lang === 'he' ? 'he' : 'en') ?? ''
-      const sName = special.render?.(lang === 'he' ? 'he' : 'en') ?? ''
+      const pName = stripNikud(parasha.render?.(lang === 'he' ? 'he' : 'en') ?? '')
+      const sName = stripNikud(special.render?.(lang === 'he' ? 'he' : 'en') ?? '')
       return `${pName} (${sName})`
     }
-    if (parasha) return parasha.render?.(lang === 'he' ? 'he' : 'en') ?? (lang === 'he' ? 'שבת' : 'Shabbat')
-    if (special) return special.render?.(lang === 'he' ? 'he' : 'en') ?? (lang === 'he' ? 'שבת' : 'Shabbat')
+    if (parasha) return stripNikud(parasha.render?.(lang === 'he' ? 'he' : 'en') ?? (lang === 'he' ? 'שבת' : 'Shabbat'))
+    if (special) return stripNikud(special.render?.(lang === 'he' ? 'he' : 'en') ?? (lang === 'he' ? 'שבת' : 'Shabbat'))
 
     return lang === 'he' ? 'שבת' : 'Shabbat'
   } catch {

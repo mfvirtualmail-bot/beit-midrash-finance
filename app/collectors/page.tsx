@@ -13,6 +13,20 @@ export default function CollectorsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Partial<Collector>>(EMPTY)
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+
+  function toggleSelect(id: number) {
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+  function toggleSelectAll() {
+    setSelected(prev => prev.size === collectors.length ? new Set() : new Set(collectors.map(c => c.id)))
+  }
+  async function deleteSelected() {
+    if (!confirm(T.confirmDelete)) return
+    await Promise.all(Array.from(selected).map(id => fetch(`/api/collectors/${id}`, { method: 'DELETE' })))
+    setSelected(new Set())
+    load()
+  }
 
   async function load() {
     setLoading(true)
@@ -57,6 +71,23 @@ export default function CollectorsPage() {
       </div>
 
       <div className="card">
+        {/* Batch action bar */}
+        {selected.size > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-800">
+              {selected.size} {lang === 'he' ? 'נבחרו' : 'selected'}
+            </span>
+            <div className="flex gap-2">
+              <button onClick={deleteSelected} className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-medium">
+                <Trash2 size={14} /> {T.delete}
+              </button>
+              <button onClick={() => setSelected(new Set())} className="text-sm px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg">
+                {T.cancel}
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-8 text-gray-400">{T.loading}</div>
         ) : collectors.length === 0 ? (
@@ -66,6 +97,9 @@ export default function CollectorsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
+                  <th className="px-2 py-2 w-10">
+                    <input type="checkbox" checked={selected.size === collectors.length && collectors.length > 0} onChange={toggleSelectAll} className="rounded" />
+                  </th>
                   <th className="text-start py-2 px-3 font-semibold text-gray-600">{T.name}</th>
                   <th className="text-start py-2 px-3 font-semibold text-gray-600 hidden sm:table-cell">{T.phone}</th>
                   <th className="text-center py-2 px-3 font-semibold text-gray-600">{T.commissionPercent}</th>
@@ -77,7 +111,10 @@ export default function CollectorsPage() {
               </thead>
               <tbody>
                 {collectors.map(c => (
-                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <tr key={c.id} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${selected.has(c.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-2 py-3">
+                      <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} className="rounded" />
+                    </td>
                     <td className="py-3 px-3">
                       <div className="font-medium text-gray-900">{c.name}</div>
                       {c.email && <div className="text-xs text-gray-500">{c.email}</div>}

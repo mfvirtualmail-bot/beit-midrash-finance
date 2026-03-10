@@ -18,12 +18,22 @@ interface Member {
   balance: number
 }
 
+interface AvailableMonth {
+  month: number
+  year: number
+  nameHe: string
+  yearHe: string
+}
+
 interface FeePreview {
   monthHe: string
   yearHe: string
   totalMembers: number
   toCharge: number
   alreadyCharged: number
+  selectedMonth: number
+  selectedYear: number
+  availableMonths: AvailableMonth[]
 }
 
 const EMPTY = { name: '', phone: '', email: '', address: '', notes: '' }
@@ -39,12 +49,29 @@ export default function MembersPage() {
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+
+  function toggleSelect(id: number) {
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+  function toggleSelectAll() {
+    setSelected(prev => prev.size === members.length ? new Set() : new Set(members.map(m => m.id)))
+  }
+  async function deleteSelected() {
+    if (!confirm(T.confirmDelete)) return
+    await Promise.all(Array.from(selected).map(id => fetch(`/api/members/${id}`, { method: 'DELETE' })))
+    setSelected(new Set())
+    load()
+  }
+
   // Monthly fee state
   const [showFeeModal, setShowFeeModal] = useState(false)
   const [feePreview, setFeePreview] = useState<FeePreview | null>(null)
   const [feeAmount, setFeeAmount] = useState('20')
   const [feeLoading, setFeeLoading] = useState(false)
   const [feeResult, setFeeResult] = useState<{ count: number; alreadyDone?: boolean } | null>(null)
+  const [selectedFeeMonth, setSelectedFeeMonth] = useState<number | null>(null)
+  const [selectedFeeYear, setSelectedFeeYear] = useState<number | null>(null)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -60,8 +87,21 @@ export default function MembersPage() {
 
   async function openFeeModal() {
     setFeeResult(null)
+    setSelectedFeeMonth(null)
+    setSelectedFeeYear(null)
     setShowFeeModal(true)
     const res = await fetch('/api/members/monthly-fee')
+    const data = await res.json()
+    setFeePreview(data)
+    setSelectedFeeMonth(data.selectedMonth)
+    setSelectedFeeYear(data.selectedYear)
+  }
+
+  async function handleMonthChange(month: number, year: number) {
+    setSelectedFeeMonth(month)
+    setSelectedFeeYear(year)
+    setFeePreview(null)
+    const res = await fetch(`/api/members/monthly-fee?month=${month}&year=${year}`)
     const data = await res.json()
     setFeePreview(data)
   }
@@ -71,7 +111,7 @@ export default function MembersPage() {
     const res = await fetch('/api/members/monthly-fee', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: Number(feeAmount) }),
+      body: JSON.stringify({ amount: Number(feeAmount), month: selectedFeeMonth, year: selectedFeeYear }),
     })
     const data = await res.json()
     setFeeResult(data)
@@ -168,6 +208,23 @@ export default function MembersPage() {
         />
       </div>
 
+      {/* Batch action bar */}
+      {selected.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-blue-800">
+            {selected.size} {lang === 'he' ? 'נבחרו' : 'selected'}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={deleteSelected} className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-medium">
+              <Trash2 size={14} /> {T.delete}
+            </button>
+            <button onClick={() => setSelected(new Set())} className="text-sm px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg">
+              {T.cancel}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="card overflow-x-auto p-0">
         {loading ? (
@@ -178,6 +235,9 @@ export default function MembersPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
               <tr>
+                <th className="px-2 py-3 w-10">
+                  <input type="checkbox" checked={selected.size === members.length && members.length > 0} onChange={toggleSelectAll} className="rounded" />
+                </th>
                 <th className="px-4 py-3 text-start">{T.name}</th>
                 <th className="px-4 py-3 text-start hidden sm:table-cell">{T.phone}</th>
                 <th className="px-4 py-3 text-end">{T.totalCharges}</th>
@@ -188,7 +248,10 @@ export default function MembersPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {members.map(m => (
-                <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={m.id} className={`hover:bg-gray-50 transition-colors ${selected.has(m.id) ? 'bg-blue-50' : ''}`}>
+                  <td className="px-2 py-3">
+                    <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggleSelect(m.id)} className="rounded" />
+                  </td>
                   <td className="px-4 py-3 font-medium text-gray-800">
                     <button onClick={() => router.push(`/members/${m.id}`)} className="hover:text-blue-600 text-start">
                       {m.name}
@@ -236,6 +299,28 @@ export default function MembersPage() {
               </h2>
             </div>
             <div className="p-6 space-y-4">
+              {/* Month selector dropdown */}
+              {!feeResult && feePreview?.availableMonths && (
+                <div>
+                  <label className="label">{lang === 'he' ? 'בחר חודש לחיוב' : 'Select Month to Charge'}</label>
+                  <select
+                    className="input w-full"
+                    dir="rtl"
+                    value={`${selectedFeeMonth}-${selectedFeeYear}`}
+                    onChange={e => {
+                      const [m, y] = e.target.value.split('-').map(Number)
+                      handleMonthChange(m, y)
+                    }}
+                  >
+                    {feePreview.availableMonths.map(am => (
+                      <option key={`${am.month}-${am.year}`} value={`${am.month}-${am.year}`}>
+                        {am.nameHe} {am.yearHe}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {feeResult ? (
                 <div className="text-center space-y-3">
                   {feeResult.count === 0 && feeResult.alreadyDone ? (

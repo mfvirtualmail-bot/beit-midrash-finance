@@ -27,6 +27,20 @@ export default function TransactionsPage() {
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [filters, setFilters] = useState({ type: '', category: '', month: '', search: '' })
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+
+  function toggleSelect(id: number) {
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+  function toggleSelectAll() {
+    setSelected(prev => prev.size === txns.length ? new Set() : new Set(txns.map(t => t.id)))
+  }
+  async function deleteSelected() {
+    if (!confirm(T.confirmDelete)) return
+    await Promise.all(Array.from(selected).map(id => fetch(`/api/transactions/${id}`, { method: 'DELETE' })))
+    setSelected(new Set())
+    loadData()
+  }
 
   const fmt = (n: number) =>
     `${T.currency}${n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -153,6 +167,23 @@ export default function TransactionsPage() {
         </div>
       </div>
 
+      {/* Batch action bar */}
+      {selected.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-blue-800">
+            {selected.size} {lang === 'he' ? 'נבחרו' : 'selected'}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={deleteSelected} className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-medium">
+              <Trash2 size={14} /> {T.delete}
+            </button>
+            <button onClick={() => setSelected(new Set())} className="text-sm px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded-lg">
+              {T.cancel}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="card p-0">
         {loading ? (
@@ -164,6 +195,9 @@ export default function TransactionsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="px-2 py-3 w-10">
+                    <input type="checkbox" checked={selected.size === txns.length && txns.length > 0} onChange={toggleSelectAll} className="rounded" />
+                  </th>
                   <th className="px-4 py-3 font-semibold text-gray-500 text-start">{T.date}</th>
                   <th className="px-4 py-3 font-semibold text-gray-500 text-start">{T.type}</th>
                   <th className="px-4 py-3 font-semibold text-gray-500 text-start">{T.description}</th>
@@ -174,7 +208,10 @@ export default function TransactionsPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {txns.map(tx => (
-                  <tr key={tx.id} className="hover:bg-gray-50">
+                  <tr key={tx.id} className={`hover:bg-gray-50 ${selected.has(tx.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-2 py-3">
+                      <input type="checkbox" checked={selected.has(tx.id)} onChange={() => toggleSelect(tx.id)} className="rounded" />
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{tx.date}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium

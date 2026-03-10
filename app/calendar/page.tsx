@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { HDate, HebrewCalendar, months, flags } from '@hebcal/core'
 import type { CalOptions } from '@hebcal/core'
-import { MONTH_HE, MONTH_EN, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getShabbatOrHolidayLabel } from '@/lib/hebrewDate'
+import { MONTH_HE, MONTH_EN, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getShabbatOrHolidayLabel, stripNikud } from '@/lib/hebrewDate'
 import { Calendar as CalIcon, ChevronLeft, ChevronRight, ShoppingCart, Star, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 
@@ -104,8 +104,8 @@ function getWeeksForHebrewMonth(hebrewMonth: number, hebrewYear: number): WeekIn
         const isMajor = !!(ev.getFlags() & (flags.CHAG | flags.MAJOR_FAST | flags.LIGHT_CANDLES))
         if (isChag || isMajor || (ev.getFlags() & flags.SPECIAL_SHABBAT)) {
           holidays.push({
-            name: ev.render?.('he') ?? ev.renderBrief?.('he') ?? '',
-            nameEn: ev.render?.('en') ?? ev.renderBrief?.('en') ?? '',
+            name: stripNikud(ev.render?.('he') ?? ev.renderBrief?.('he') ?? ''),
+            nameEn: stripNikud(ev.render?.('en') ?? ev.renderBrief?.('en') ?? ''),
             date: ev.getDate().greg(),
             isChag,
           })
@@ -174,8 +174,8 @@ function getUpcomingHolidays(count: number): HolidayEvent[] {
       if (isChag || isMajorFast || isRoshChodesh) {
         const hd = ev.getDate()
         holidays.push({
-          name: ev.render?.('he') ?? '',
-          nameEn: ev.render?.('en') ?? '',
+          name: stripNikud(ev.render?.('he') ?? ''),
+          nameEn: stripNikud(ev.render?.('en') ?? ''),
           date: hd.greg(),
           hebrewDate: `${HEBREW_DIGITS[hd.getDate()] ?? hd.getDate()} ${MONTH_HE[hd.getMonth()] ?? ''}`,
           isChag,
@@ -204,7 +204,8 @@ export default function CalendarPage() {
   const currentMonthInfo = monthsInYear.find(m => m.month === hebrewMonth)
   const weeks = useMemo(() => getWeeksForHebrewMonth(hebrewMonth, hebrewYear), [hebrewMonth, hebrewYear])
   const upcomingHolidays = useMemo(() => getUpcomingHolidays(10), [])
-  const dayNames = lang === 'he' ? DAY_NAMES_HE : DAY_NAMES_EN
+  // Calendar always displays in Hebrew regardless of app language
+  const dayNames = DAY_NAMES_HE
 
   function navigateMonth(dir: -1 | 1) {
     const idx = monthsInYear.findIndex(m => m.month === hebrewMonth)
@@ -252,7 +253,7 @@ export default function CalendarPage() {
 
           <div className="text-center">
             <h2 className="text-xl font-bold text-gray-900">
-              {lang === 'he' ? currentMonthInfo?.nameHe : currentMonthInfo?.nameEn}
+              {currentMonthInfo?.nameHe}
             </h2>
             <p className="text-sm text-gray-500">{hebrewYear}</p>
           </div>
@@ -273,7 +274,7 @@ export default function CalendarPage() {
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
-              {lang === 'he' ? m.nameHe : m.nameEn}
+              {m.nameHe}
             </button>
           ))}
         </div>
@@ -325,7 +326,7 @@ export default function CalendarPage() {
                 {week.parashaHe && (
                   <span className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-lg text-xs font-semibold">
                     <BookOpen size={12} />
-                    {lang === 'he' ? week.parashaHe : week.parashaEn}
+                    {week.parashaHe}
                   </span>
                 )}
                 {/* Holidays */}
@@ -333,7 +334,7 @@ export default function CalendarPage() {
                   <span key={i} className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium
                     ${h.isChag ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-700'}`}>
                     <Star size={11} />
-                    {lang === 'he' ? h.name : h.nameEn}
+                    {h.name}
                   </span>
                 ))}
               </div>
@@ -366,14 +367,14 @@ export default function CalendarPage() {
                 ${h.isMajor ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
                 <div>
                   <span className={`font-medium text-sm ${h.isMajor ? 'text-amber-900' : 'text-gray-800'}`}>
-                    {lang === 'he' ? h.name : h.nameEn}
+                    {h.name}
                   </span>
                   <span className="text-xs text-gray-500 mx-2">
                     {h.hebrewDate}
                   </span>
                 </div>
                 <span className="text-xs text-gray-500">
-                  {h.date.toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-GB', { day: 'numeric', month: 'short' })}
+                  {h.date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' })}
                 </span>
               </div>
             ))}

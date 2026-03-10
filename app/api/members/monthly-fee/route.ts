@@ -1,17 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE, hebrewYearStr } from '@/lib/hebrewDate'
+import { MONTH_HE, hebrewYearStr, getHebrewMonthsInYear } from '@/lib/hebrewDate'
 
-// GET: preview how many members will be charged this Hebrew month
-export async function GET() {
+function getMonthInfo(monthNum: number, yearNum: number) {
+  const monthHe = MONTH_HE[monthNum] ?? ''
+  const hd = new HDate(1, monthNum, yearNum)
+  const yearHe = hebrewYearStr(hd)
+  const feeDesc = `דמי חבר - ${monthHe} ${yearHe}`
+  const dateStr = hd.greg().toISOString().split('T')[0]
+  return { monthHe, yearHe, feeDesc, dateStr }
+}
+
+// GET: preview — accepts ?month=X&year=Y (optional, defaults to current Hebrew month)
+export async function GET(req: NextRequest) {
   try {
+    const url = new URL(req.url)
     const hd = new HDate(new Date())
-    const monthNum = hd.getMonth()
-    const yearNum = hd.getFullYear()
-    const monthHe = MONTH_HE[monthNum] ?? ''
-    const yearHe = hebrewYearStr(hd)
-    const feeDesc = `דמי חבר - ${monthHe} ${yearHe}`
+    const monthNum = url.searchParams.get('month') ? Number(url.searchParams.get('month')) : hd.getMonth()
+    const yearNum = url.searchParams.get('year') ? Number(url.searchParams.get('year')) : hd.getFullYear()
+
+    const { monthHe, yearHe, feeDesc } = getMonthInfo(monthNum, yearNum)
+
+    // Return available months (current + previous Hebrew year)
+    const currentYear = hd.getFullYear()
+    const prevYear = currentYear - 1
+    const mkMonth = (m: { month: number; nameHe: string }, yr: number) => ({
+      month: m.month, year: yr, nameHe: m.nameHe, yearHe: hebrewYearStr(new HDate(1, m.month, yr)),
+    })
+    const availableMonths = [
+      ...getHebrewMonthsInYear(prevYear).map(m => mkMonth(m, prevYear)),
+      ...getHebrewMonthsInYear(currentYear).map(m => mkMonth(m, currentYear)),
+    ]
 
     const { data: members } = await supabase.from('members').select('id').eq('active', 1)
     const memberIds = (members ?? []).map((m: { id: number }) => m.id)
@@ -33,24 +53,26 @@ export async function GET() {
       totalMembers: memberIds.length,
       toCharge: memberIds.length - alreadyCharged,
       alreadyCharged,
+      selectedMonth: monthNum,
+      selectedYear: yearNum,
+      availableMonths,
     })
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
 
-// POST: charge all (uncharged) active members for the current Hebrew month
+// POST: charge all (uncharged) active members — accepts { amount, month, year }
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const amount = Number(body.amount) || 20
 
     const hd = new HDate(new Date())
-    const monthNum = hd.getMonth()
-    const yearNum = hd.getFullYear()
-    const monthHe = MONTH_HE[monthNum] ?? ''
-    const yearHe = hebrewYearStr(hd)
-    const feeDesc = `דמי חבר - ${monthHe} ${yearHe}`
+    const monthNum = body.month ? Number(body.month) : hd.getMonth()
+    const yearNum = body.year ? Number(body.year) : hd.getFullYear()
+
+    const { monthHe, yearHe, feeDesc, dateStr } = getMonthInfo(monthNum, yearNum)
 
     const { data: members } = await supabase.from('members').select('id').eq('active', 1)
     if (!members || members.length === 0) {
@@ -70,10 +92,6 @@ export async function POST(req: NextRequest) {
     if (toCharge.length === 0) {
       return NextResponse.json({ count: 0, monthHe, yearHe, alreadyDone: true })
     }
-
-    // First of the Hebrew month in Gregorian
-    const firstOfMonth = new HDate(1, monthNum, yearNum).greg()
-    const dateStr = firstOfMonth.toISOString().split('T')[0]
 
     const charges = toCharge.map((m: { id: number }) => ({
       member_id: m.id,
