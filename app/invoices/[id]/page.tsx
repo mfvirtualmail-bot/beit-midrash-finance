@@ -177,162 +177,158 @@ export default function InvoiceDetailPage() {
       {/* Statement content */}
       <div
         id="invoice-print"
-        className="bg-white rounded-2xl shadow-sm border border-gray-200 max-w-3xl mx-auto"
+        className="max-w-3xl mx-auto overflow-hidden rounded-2xl shadow-sm border border-gray-200"
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        {/* Header */}
-        <div className="border-b-4 border-blue-600 p-6 pb-4">
-          <div className="flex items-start justify-between mb-3">
+        {/* Header block */}
+        <div className="bg-gradient-to-bl from-blue-700 via-blue-600 to-blue-800 text-white p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <img src="/api/logo" alt="Logo" className="w-14 h-14 object-contain rounded-lg bg-white/15 p-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <div>
-              <div className="text-xl font-bold text-blue-700 flex items-center gap-2">
-                <img src="/api/logo" alt="Logo" className="w-14 h-14 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                {orgName}
-              </div>
-              {settings?.org_address && <div className="text-gray-500 text-xs mt-1">{settings.org_address}</div>}
+              <div className="text-lg font-bold tracking-wide">{orgName}</div>
+              {settings?.org_address && <div className="text-[10px] text-white/80 mt-0.5">{settings.org_address}</div>}
               {(settings?.org_phone || settings?.org_email) && (
-                <div className="text-gray-500 text-xs mt-0.5">
-                  {settings?.org_phone}{settings?.org_phone && settings?.org_email ? '  |  ' : ''}{settings?.org_email}
+                <div className="text-[10px] text-white/75 mt-0.5">
+                  {[settings?.org_phone, settings?.org_email].filter(Boolean).join(' · ')}
                 </div>
               )}
-              {headerText && (
-                <div className="text-gray-600 text-xs mt-1 whitespace-pre-line border-t border-gray-200 pt-1">{headerText}</div>
-              )}
             </div>
-            <div className="text-end">
-              <div className="text-2xl font-bold text-gray-800">{he ? 'דף חשבון' : 'Statement'}</div>
-              <div className="text-gray-500 font-mono text-xs mt-1">{invoice.number || `#${invoice.id}`}</div>
-              <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[invoice.status]}`}>
-                {statusLabel(invoice.status)}
+          </div>
+          <div className="text-end">
+            <div className="text-2xl font-extrabold tracking-wider">{he ? 'דף חשבון' : 'Statement'}</div>
+            <div className="text-xs text-white/70 mt-1 font-mono">{invoice.number || `#${invoice.id}`}</div>
+            <div className="text-xs text-white/70 mt-0.5">{invoice.date}</div>
+          </div>
+        </div>
+
+        {headerText && (
+          <div className="bg-blue-50 border-e-4 border-blue-600 px-4 py-2 text-[10px] text-blue-800 whitespace-pre-line">{headerText}</div>
+        )}
+
+        {/* Recipient block */}
+        <div className="mx-5 mt-4 mb-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <div className="text-[10px] text-slate-400 font-medium mb-0.5">{T.recipient}</div>
+          <div className="text-base font-bold text-slate-900">
+            {invoice.member_id ? (
+              <Link href={`/members/${invoice.member_id}`} className="text-blue-700 hover:text-blue-900 hover:underline">
+                {invoice.member_name || invoice.donor_name_he}
+              </Link>
+            ) : (
+              <span>{invoice.member_name || invoice.donor_name_he}</span>
+            )}
+          </div>
+          <div className="text-xs text-slate-400 mt-0.5" dir="rtl">{formatHebrewDate(invoice.date, 'he')}</div>
+        </div>
+
+        {/* Table block */}
+        {hasStatement ? (
+          <>
+            <div className="mx-5 border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="text-start py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200" style={{ width: '22%' }}>{he ? 'תקופה / שבוע' : 'Period / Week'}</th>
+                    <th className="text-start py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200" style={{ width: '38%' }}>{he ? 'פריט / תיאור' : 'Item / Description'}</th>
+                    <th className="text-end py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200" style={{ width: '20%' }}>{he ? 'חיוב (€)' : 'Charge (€)'}</th>
+                    <th className="text-end py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200" style={{ width: '20%' }}>{he ? 'תשלום (€)' : 'Payment (€)'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statementData!.lines.map((line, i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                      <td className="py-2 px-3.5 text-slate-500 font-medium text-[11px]" dir="rtl">{line.period || line.hebrewDate || line.date}</td>
+                      <td className="py-2 px-3.5 font-semibold text-slate-800 text-[12px]">{line.description}</td>
+                      <td className="py-2 px-3.5 text-end text-red-600 font-semibold text-[12px]">{line.charge > 0 ? fmt(line.charge) : ''}</td>
+                      <td className="py-2 px-3.5 text-end text-green-600 font-semibold text-[12px]">{line.payment > 0 ? fmt(line.payment) : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Totals block */}
+            <div className="mx-5 mt-3 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
+                <span className="text-xs font-semibold text-slate-500">{he ? 'סה"כ חיובים' : 'Total Charges'}</span>
+                <span className="text-sm font-bold text-red-600">{fmt(statementData!.totalCharged)}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-xs font-semibold text-slate-500">{he ? 'סה"כ תשלומים' : 'Total Payments'}</span>
+                <span className="text-sm font-bold text-green-600">{fmt(statementData!.totalPaid)}</span>
+              </div>
+            </div>
+
+            {/* Balance block */}
+            <div className={`mx-5 mt-3 rounded-xl p-4 flex items-center justify-between ${statementData!.remainingBalance <= 0 ? 'bg-gradient-to-bl from-green-700 to-green-600' : 'bg-gradient-to-bl from-blue-800 via-blue-600 to-blue-700'} text-white`}>
+              <span className="text-base font-bold">{he ? 'יתרת חוב' : 'Remaining Balance'}</span>
+              <span className="text-xl font-extrabold tracking-wide">
+                {statementData!.remainingBalance > 0
+                  ? fmt(statementData!.remainingBalance)
+                  : statementData!.remainingBalance < 0
+                    ? `${he ? 'זיכוי' : 'Credit'} ${fmt(Math.abs(statementData!.remainingBalance))}`
+                    : '€0.00'
+                }
               </span>
             </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Meta: recipient + date */}
-          <div className="flex items-start justify-between gap-4 text-sm">
-            <div>
-              {(invoice.member_name || invoice.donor_name_he) && (
-                <div>
-                  <span className="text-gray-500">{T.recipient}: </span>
-                  {invoice.member_id ? (
-                    <Link href={`/members/${invoice.member_id}`} className="font-bold text-blue-700 hover:text-blue-900 hover:underline">
-                      {invoice.member_name || invoice.donor_name_he}
-                    </Link>
-                  ) : (
-                    <span className="font-bold text-gray-800">{invoice.member_name || invoice.donor_name_he}</span>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="text-end">
-              <div className="font-semibold text-gray-800 text-sm">{invoice.date}</div>
-              <div className="text-gray-400 text-xs" dir="rtl">{formatHebrewDate(invoice.date, 'he')}</div>
-            </div>
-          </div>
-
-          {/* 4-column statement table */}
-          {hasStatement ? (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-blue-600 text-white">
-                  <th className="text-start py-2 px-3 font-semibold rounded-ss-lg" style={{ width: '22%' }}>{he ? 'תקופה / שבוע' : 'Period / Week'}</th>
-                  <th className="text-start py-2 px-3 font-semibold" style={{ width: '38%' }}>{he ? 'פריט / תיאור' : 'Item / Description'}</th>
-                  <th className="text-end py-2 px-3 font-semibold" style={{ width: '20%' }}>{he ? 'חיוב (€)' : 'Charge (€)'}</th>
-                  <th className="text-end py-2 px-3 font-semibold rounded-se-lg" style={{ width: '20%' }}>{he ? 'תשלום (€)' : 'Payment (€)'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {statementData!.lines.map((line, i) => (
-                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="py-1.5 px-3 text-gray-600" dir="rtl">{line.period || line.hebrewDate || line.date}</td>
-                    <td className="py-1.5 px-3 font-medium text-gray-800">{line.description}</td>
-                    <td className="py-1.5 px-3 text-end text-red-600">{line.charge > 0 ? fmt(line.charge) : ''}</td>
-                    <td className="py-1.5 px-3 text-end text-green-600">{line.payment > 0 ? fmt(line.payment) : ''}</td>
+          </>
+        ) : invoice.items && invoice.items.length > 0 ? (
+          <>
+            <div className="mx-5 border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="text-start py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200">{he ? 'תקופה / שבוע' : 'Date / Period'}</th>
+                    <th className="text-start py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200">{he ? 'פריט' : 'Item'}</th>
+                    <th className="text-end py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200">{he ? 'חיוב (€)' : 'Charge (€)'}</th>
+                    <th className="text-end py-2.5 px-3.5 font-bold text-slate-500 text-[11px] uppercase tracking-wider border-b-2 border-slate-200">{he ? 'תשלום (€)' : 'Payment (€)'}</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-100 border-t-2 border-gray-300">
-                  <td className="py-2 px-3" colSpan={2}>
-                    <span className="font-bold text-gray-700">{he ? 'סה"כ' : 'Total'}</span>
-                  </td>
-                  <td className="py-2 px-3 text-end font-bold text-red-700">{fmt(statementData!.totalCharged)}</td>
-                  <td className="py-2 px-3 text-end font-bold text-green-700">{fmt(statementData!.totalPaid)}</td>
-                </tr>
-                <tr className="bg-blue-600 text-white">
-                  <td className="py-2.5 px-3 rounded-bs-lg" colSpan={2}>
-                    <span className="font-bold text-base">{he ? 'יתרת חוב' : 'Remaining Balance'}</span>
-                  </td>
-                  <td className="py-2.5 px-3 text-end font-bold text-lg rounded-be-lg" colSpan={2}>
-                    {statementData!.remainingBalance > 0
-                      ? fmt(statementData!.remainingBalance)
-                      : statementData!.remainingBalance < 0
-                        ? `${he ? 'זיכוי' : 'Credit'} ${fmt(Math.abs(statementData!.remainingBalance))}`
-                        : '€0.00'
+                </thead>
+                <tbody>
+                  {invoice.items.map((item, i) => {
+                    let period = (item as { period?: string }).period || ''
+                    let itemName = item.description_he || ''
+                    if (!period && itemName.includes(' - ')) {
+                      const parts = itemName.split(' - ')
+                      period = parts[0]
+                      itemName = parts.slice(1).join(' - ')
                     }
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          ) : invoice.items && invoice.items.length > 0 ? (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-blue-600 text-white">
-                  <th className="text-start py-2 px-3 rounded-ss-lg font-semibold">{he ? 'תקופה / שבוע' : 'Date / Period'}</th>
-                  <th className="text-start py-2 px-3 font-semibold">{he ? 'פריט' : 'Item'}</th>
-                  <th className="text-end py-2 px-3 font-semibold">{he ? 'חיוב (€)' : 'Charge (€)'}</th>
-                  <th className="text-end py-2 px-3 rounded-se-lg font-semibold">{he ? 'תשלום (€)' : 'Payment (€)'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.items.map((item, i) => {
-                  let period = (item as { period?: string }).period || ''
-                  let itemName = item.description_he || ''
-                  if (!period && itemName.includes(' - ')) {
-                    const parts = itemName.split(' - ')
-                    period = parts[0]
-                    itemName = parts.slice(1).join(' - ')
-                  }
-                  return (
-                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="py-1.5 px-3 text-gray-600">{period || '—'}</td>
-                      <td className="py-1.5 px-3 font-medium">{itemName}</td>
-                      <td className="py-1.5 px-3 text-end text-red-600">{fmt(Number(item.amount))}</td>
-                      <td className="py-1.5 px-3 text-end text-green-600"></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-blue-600 text-white">
-                  <td className="py-2 px-3 rounded-bs-lg"></td>
-                  <td className="py-2 px-3 font-bold text-end">{T.total}</td>
-                  <td className="py-2 px-3 font-bold text-end text-lg" colSpan={2}>{fmt(invoice.total ?? 0)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          ) : null}
-
-          {invoice.notes && (
-            <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600">
-              <div className="font-semibold text-gray-700 mb-1">{T.notes}</div>
-              <div className="whitespace-pre-line">{invoice.notes}</div>
+                    return (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                        <td className="py-2 px-3.5 text-slate-500 font-medium text-[11px]">{period || '—'}</td>
+                        <td className="py-2 px-3.5 font-semibold text-slate-800 text-[12px]">{itemName}</td>
+                        <td className="py-2 px-3.5 text-end text-red-600 font-semibold text-[12px]">{fmt(Number(item.amount))}</td>
+                        <td className="py-2 px-3.5 text-end text-green-600"></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
+            <div className="mx-5 mt-3 bg-gradient-to-bl from-blue-800 via-blue-600 to-blue-700 text-white rounded-xl p-4 flex items-center justify-between">
+              <span className="text-base font-bold">{T.total}</span>
+              <span className="text-xl font-extrabold">{fmt(invoice.total ?? 0)}</span>
+            </div>
+          </>
+        ) : null}
 
-        {/* Footer */}
-        {(footerText || settings?.org_phone || settings?.org_email) && (
-          <div className="border-t-2 border-gray-200 px-6 py-4 bg-gray-50 rounded-b-2xl">
-            {footerText && <div className="text-xs text-gray-600 whitespace-pre-line">{footerText}</div>}
+        {invoice.notes && (
+          <div className="mx-5 mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+            <div className="text-[11px] font-bold text-slate-500 mb-1">{T.notes}</div>
+            <div className="text-xs text-slate-600 whitespace-pre-line">{invoice.notes}</div>
+          </div>
+        )}
+
+        {/* Footer block */}
+        {(footerText || settings?.org_phone || settings?.org_email) ? (
+          <div className="mx-5 mt-4 mb-5 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center">
+            {footerText && <div className="text-[10px] text-slate-500 whitespace-pre-line">{footerText}</div>}
             {!footerText && (settings?.org_phone || settings?.org_email) && (
-              <div className="text-xs text-gray-500 text-center">
-                {settings?.org_phone}{settings?.org_phone && settings?.org_email ? '  |  ' : ''}{settings?.org_email}
+              <div className="text-[10px] text-slate-400">
+                {[settings?.org_phone, settings?.org_email].filter(Boolean).join(' · ')}
               </div>
             )}
           </div>
-        )}
+        ) : <div className="h-5" />}
       </div>
 
       {/* PDF Preview Modal */}
