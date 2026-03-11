@@ -5,7 +5,7 @@ import { useLang } from '@/lib/LangContext'
 import { Category, Member } from '@/lib/db'
 import { HDate } from '@hebcal/core'
 import { MONTH_HE, MONTH_EN, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange } from '@/lib/hebrewDate'
-import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Settings, Edit2, Calendar, Upload } from 'lucide-react'
+import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Settings, Edit2, Calendar, Upload, Pencil, X } from 'lucide-react'
 import Link from 'next/link'
 
 interface PurchaseRow {
@@ -170,6 +170,71 @@ function PurchasesPageInner() {
   const [editingType, setEditingType] = useState<Category | null>(null)
   const [savingType, setSavingType] = useState(false)
   const [deleteTypeId, setDeleteTypeId] = useState<number | null>(null)
+  // Existing purchases for selected week
+  interface ExistingPurchase { id: number; amount: number; description_he: string; date: string; notes: string | null; member_id: number | null; member_name?: string; category_name_he?: string }
+  const [existingPurchases, setExistingPurchases] = useState<ExistingPurchase[]>([])
+  const [loadingPurchases, setLoadingPurchases] = useState(false)
+  const [editPurchase, setEditPurchase] = useState<ExistingPurchase | null>(null)
+  const [editForm, setEditForm] = useState({ amount: '', notes: '' })
+  const [deletePurchaseId, setDeletePurchaseId] = useState<number | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
+
+  async function loadExistingPurchases(weekStr: string) {
+    if (!weekStr) return
+    setLoadingPurchases(true)
+    try {
+      // Get the Saturday of the week
+      const [y, m, d] = weekStr.split('-').map(Number)
+      const sunday = new Date(y, m - 1, d)
+      const saturday = new Date(sunday)
+      saturday.setDate(sunday.getDate() + 6)
+      const satStr = saturday.toISOString().split('T')[0]
+
+      const res = await fetch(`/api/transactions?type=expense&limit=500`)
+      const data = await res.json()
+      // Filter to purchases in this week
+      const weekPurchases = (data as ExistingPurchase[]).filter((tx: ExistingPurchase) =>
+        tx.date >= weekStr && tx.date <= satStr && tx.member_id
+      )
+      setExistingPurchases(weekPurchases)
+    } catch { setExistingPurchases([]) }
+    setLoadingPurchases(false)
+  }
+
+  // Load existing purchases when week changes
+  useEffect(() => { if (effectiveWeekDate) loadExistingPurchases(effectiveWeekDate) }, [effectiveWeekDate])
+
+  function openEditPurchase(p: ExistingPurchase) {
+    setEditPurchase(p)
+    setEditForm({ amount: String(p.amount), notes: p.notes || '' })
+  }
+
+  async function handleEditPurchaseSave() {
+    if (!editPurchase) return
+    setEditSaving(true)
+    await fetch(`/api/transactions/${editPurchase.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'expense',
+        amount: Number(editForm.amount),
+        description_he: editPurchase.description_he,
+        description_en: null,
+        category_id: null,
+        date: editPurchase.date,
+        notes: editForm.notes || null,
+      }),
+    })
+    setEditSaving(false)
+    setEditPurchase(null)
+    loadExistingPurchases(effectiveWeekDate)
+  }
+
+  async function handleDeletePurchase(id: number) {
+    await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+    setDeletePurchaseId(null)
+    loadExistingPurchases(effectiveWeekDate)
+  }
 
   async function loadCategories() {
     const res = await fetch('/api/categories')
@@ -222,6 +287,7 @@ function PurchasesPageInner() {
     setSavedCount(valid.length)
     setRows([newRow(), newRow(), newRow()])
     setTimeout(() => setSavedCount(null), 4000)
+    loadExistingPurchases(effectiveWeekDate)
   }
 
   function openAddType() {
@@ -413,6 +479,106 @@ function PurchasesPageInner() {
           </div>
         </div>
       </div>
+
+      {/* Existing Purchases for Selected Week */}
+      {existingPurchases.length > 0 && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <ShoppingCart size={18} className="text-orange-500" />
+            {lang === 'he' ? `רכישות קיימות (${existingPurchases.length})` : `Existing Purchases (${existingPurchases.length})`}
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-start py-2 px-2 font-semibold text-gray-600">{lang === 'he' ? 'פריט' : 'Item'}</th>
+                  <th className="text-start py-2 px-2 font-semibold text-gray-600">{T.member}</th>
+                  <th className="text-end py-2 px-2 font-semibold text-gray-600">{T.amount} (€)</th>
+                  <th className="text-start py-2 px-2 font-semibold text-gray-600 hidden sm:table-cell">{T.notes}</th>
+                  <th className="w-20"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {existingPurchases.map(p => {
+                  const desc = p.description_he || ''
+                  const dashIdx = desc.indexOf(' - ')
+                  const itemName = dashIdx > 0 ? desc.substring(dashIdx + 3) : (p.category_name_he || desc)
+                  const memberName = p.notes?.split(' - ')[0] || (members.find(m => m.id === p.member_id)?.name) || '—'
+                  return (
+                    <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="py-2 px-2 text-gray-700">{itemName}</td>
+                      <td className="py-2 px-2">
+                        {p.member_id ? (
+                          <Link href={`/members/${p.member_id}`} className="text-blue-700 hover:text-blue-900 hover:underline text-sm">
+                            {memberName}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-500 text-sm">{memberName}</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-2 text-end font-semibold text-orange-600">{fmt(p.amount)}</td>
+                      <td className="py-2 px-2 text-gray-400 text-xs hidden sm:table-cell truncate max-w-[150px]">{p.notes || ''}</td>
+                      <td className="py-2 px-2">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEditPurchase(p)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600">
+                            <Pencil size={13} />
+                          </button>
+                          <button onClick={() => setDeletePurchaseId(p.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Purchase Modal */}
+      {editPurchase && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">{lang === 'he' ? 'ערוך רכישה' : 'Edit Purchase'}</h2>
+              <button onClick={() => setEditPurchase(null)} className="p-1 rounded hover:bg-gray-100"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="label">{T.amount} (€)</label>
+                <input type="number" className="input w-full" min="0" step="0.01"
+                  value={editForm.amount} onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">{T.notes}</label>
+                <input className="input w-full" value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex gap-3 p-6 border-t justify-end">
+              <button onClick={() => setEditPurchase(null)} className="btn-secondary">{T.cancel}</button>
+              <button onClick={handleEditPurchaseSave} disabled={editSaving} className="btn-primary">
+                {editSaving ? T.loading : T.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Purchase Confirm */}
+      {deletePurchaseId !== null && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center space-y-4">
+            <p className="font-medium text-gray-800">{T.confirmDelete}</p>
+            <div className="flex gap-2">
+              <button onClick={() => handleDeletePurchase(deletePurchaseId)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex-1">{T.delete}</button>
+              <button onClick={() => setDeletePurchaseId(null)} className="btn-secondary flex-1">{T.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Purchase Types Management Modal */}
       {showTypesModal && (

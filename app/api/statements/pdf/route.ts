@@ -3,13 +3,12 @@ import { supabase } from '@/lib/supabase'
 import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
 
 // GET /api/statements/pdf?member_ids=1,2,3&date_from=...&date_to=...
-// Returns an HTML page optimized for A4 PDF output
-// With &download=1, returns Content-Disposition: attachment to trigger direct download
+// Returns clean HTML optimized for A4 PDF rendering (used by client-side PDF generator)
+// No browser print dialog — client handles PDF generation via html2canvas + jsPDF
 export async function GET(req: NextRequest) {
   const memberIdsParam = req.nextUrl.searchParams.get('member_ids')
   const dateFrom = req.nextUrl.searchParams.get('date_from')
   const dateTo = req.nextUrl.searchParams.get('date_to')
-  const download = req.nextUrl.searchParams.get('download')
 
   if (!memberIdsParam) {
     return NextResponse.json({ error: 'member_ids required' }, { status: 400 })
@@ -283,22 +282,8 @@ export async function GET(req: NextRequest) {
     .statement-page { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; }
   }
 </style>
-<script>
-// Auto-trigger print dialog for direct PDF download
-window.addEventListener('load', function() {
-  if (window.location.search.includes('download=1')) {
-    setTimeout(function() { window.print(); }, 500);
-  }
-});
-</script>
 </head>
 <body>
-<div class="no-print" style="text-align:center;padding:15px;background:#f3f4f6">
-  <button onclick="window.print()" style="background:#2563eb;color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600">
-    הורד / הדפס PDF
-  </button>
-  <span style="margin:0 10px;color:#6b7280">${members.length} ${members.length === 1 ? 'דף חשבון' : 'דפי חשבון'}</span>
-</div>
 ${pages.join('\n')}
 </body>
 </html>`

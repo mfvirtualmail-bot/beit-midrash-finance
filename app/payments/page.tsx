@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Plus, Search, Trash2, Upload, CheckCircle, Banknote } from 'lucide-react'
+import { Plus, Search, Trash2, Upload, CheckCircle, Banknote, Pencil, X } from 'lucide-react'
 import Link from 'next/link'
 
 interface Payment {
@@ -32,12 +32,14 @@ export default function PaymentsPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<Payment | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [memberSearch, setMemberSearch] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [successMsg, setSuccessMsg] = useState('')
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -63,8 +65,25 @@ export default function PaymentsPage() {
   }
 
   function openAdd() {
+    setEditing(null)
     setForm({ ...EMPTY_FORM, date: new Date().toISOString().split('T')[0] })
     setMemberSearch('')
+    setShowForm(true)
+    setSuccessMsg('')
+  }
+
+  function openEdit(payment: Payment) {
+    setEditing(payment)
+    setForm({
+      member_id: String(payment.member_id),
+      amount: String(payment.amount),
+      date: payment.date,
+      hebrewDateText: payment.reference || '',
+      method: payment.method,
+      reference: '',
+      notes: payment.notes || '',
+    })
+    setMemberSearch(payment.member_name || '')
     setShowForm(true)
     setSuccessMsg('')
   }
@@ -84,27 +103,58 @@ export default function PaymentsPage() {
     if (!form.member_id || !form.amount) return
     setSaving(true)
     try {
-      const res = await fetch('/api/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          member_id: Number(form.member_id),
-          amount: Number(form.amount),
-          date: form.date || undefined,
-          method: form.method,
-          reference: form.hebrewDateText || form.reference || undefined,
-          notes: form.notes || undefined,
-        }),
-      })
-      if (res.ok) {
-        setShowForm(false)
-        setSuccessMsg(he ? 'התשלום נרשם בהצלחה' : 'Payment recorded successfully')
-        setTimeout(() => setSuccessMsg(''), 3000)
-        load()
+      if (editing) {
+        // Update existing payment
+        const res = await fetch(`/api/members/${editing.member_id}/payments/${editing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: Number(form.amount),
+            date: form.date || undefined,
+            method: form.method,
+            reference: form.hebrewDateText || form.reference || undefined,
+            notes: form.notes || undefined,
+          }),
+        })
+        if (res.ok) {
+          setShowForm(false)
+          setEditing(null)
+          setSuccessMsg(he ? 'התשלום עודכן בהצלחה' : 'Payment updated successfully')
+          setTimeout(() => setSuccessMsg(''), 3000)
+          load()
+        }
+      } else {
+        // Create new payment
+        const res = await fetch('/api/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            member_id: Number(form.member_id),
+            amount: Number(form.amount),
+            date: form.date || undefined,
+            method: form.method,
+            reference: form.hebrewDateText || form.reference || undefined,
+            notes: form.notes || undefined,
+          }),
+        })
+        if (res.ok) {
+          setShowForm(false)
+          setSuccessMsg(he ? 'התשלום נרשם בהצלחה' : 'Payment recorded successfully')
+          setTimeout(() => setSuccessMsg(''), 3000)
+          load()
+        }
       }
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleDelete(id: number) {
+    const payment = payments.find(p => p.id === id)
+    if (!payment) return
+    await fetch(`/api/members/${payment.member_id}/payments/${id}`, { method: 'DELETE' })
+    setDeleteId(null)
+    load()
   }
 
   function toggleSelect(id: number) {
@@ -211,6 +261,7 @@ export default function PaymentsPage() {
                 <th className="px-4 py-3 text-end">{T.amount}</th>
                 <th className="px-4 py-3 text-start hidden sm:table-cell">{he ? 'אמצעי' : 'Method'}</th>
                 <th className="px-4 py-3 text-start hidden md:table-cell">{T.notes}</th>
+                <th className="px-4 py-3 text-center w-20">{T.edit}/{T.delete}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -220,7 +271,15 @@ export default function PaymentsPage() {
                     <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} className="rounded" />
                   </td>
                   <td className="px-4 py-3 text-gray-600">{p.date}</td>
-                  <td className="px-4 py-3 font-medium text-gray-800">{p.member_name || '—'}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {p.member_id ? (
+                      <Link href={`/members/${p.member_id}`} className="text-blue-700 hover:text-blue-900 hover:underline">
+                        {p.member_name || '—'}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-800">{p.member_name || '—'}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-end font-semibold text-green-600">{fmt(p.amount)}</td>
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
@@ -231,6 +290,16 @@ export default function PaymentsPage() {
                     {p.reference && <span className="text-blue-500 me-1">[{p.reference}]</span>}
                     {p.notes || ''}
                   </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => openEdit(p)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => setDeleteId(p.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -238,15 +307,18 @@ export default function PaymentsPage() {
         )}
       </div>
 
-      {/* Record Payment Modal */}
+      {/* Add/Edit Payment Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-6 border-b border-gray-100">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Banknote size={20} className="text-green-500" />
-                {he ? 'רשום תשלום' : 'Record Payment'}
+                {editing ? (he ? 'ערוך תשלום' : 'Edit Payment') : (he ? 'רשום תשלום' : 'Record Payment')}
               </h2>
+              <button onClick={() => { setShowForm(false); setEditing(null) }} className="p-1 rounded hover:bg-gray-100">
+                <X size={20} />
+              </button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               {/* Member searchable dropdown */}
@@ -259,7 +331,6 @@ export default function PaymentsPage() {
                   onChange={e => {
                     setMemberSearch(e.target.value)
                     setShowDropdown(true)
-                    // Clear selection if they're typing something new
                     if (form.member_id) {
                       const selectedMember = members.find(m => m.id === Number(form.member_id))
                       if (selectedMember && e.target.value !== selectedMember.name) {
@@ -268,9 +339,10 @@ export default function PaymentsPage() {
                     }
                   }}
                   onFocus={() => setShowDropdown(true)}
+                  disabled={!!editing}
                   required
                 />
-                {showDropdown && memberSearch && filteredMembers.length > 0 && (
+                {showDropdown && memberSearch && filteredMembers.length > 0 && !editing && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                     {filteredMembers.map(m => (
                       <button
@@ -284,7 +356,7 @@ export default function PaymentsPage() {
                     ))}
                   </div>
                 )}
-                {showDropdown && memberSearch && filteredMembers.length === 0 && (
+                {showDropdown && memberSearch && filteredMembers.length === 0 && !editing && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 text-sm text-gray-400 text-center">
                     {he ? 'לא נמצא חבר' : 'No member found'}
                   </div>
@@ -359,11 +431,24 @@ export default function PaymentsPage() {
                 <button type="submit" disabled={saving || !form.member_id} className="btn-primary flex-1">
                   {saving ? T.loading : T.save}
                 </button>
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">
+                <button type="button" onClick={() => { setShowForm(false); setEditing(null) }} className="btn-secondary flex-1">
                   {T.cancel}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {deleteId !== null && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center">
+            <p className="text-lg font-medium mb-6">{T.confirmDelete}</p>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => setDeleteId(null)} className="btn-secondary">{T.cancel}</button>
+              <button onClick={() => handleDelete(deleteId)} className="btn-danger">{T.delete}</button>
+            </div>
           </div>
         </div>
       )}

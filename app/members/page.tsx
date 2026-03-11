@@ -255,10 +255,10 @@ export default function MembersPage() {
                   <td className="px-2 py-3">
                     <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggleSelect(m.id)} className="rounded" />
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-800">
-                    <button onClick={() => router.push(`/members/${m.id}`)} className="hover:text-blue-600 text-start">
+                  <td className="px-4 py-3 font-medium">
+                    <Link href={`/members/${m.id}`} className="text-blue-700 hover:text-blue-900 hover:underline">
                       {m.name}
-                    </button>
+                    </Link>
                     {m.email && <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"><Mail size={10} />{m.email}</div>}
                   </td>
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
