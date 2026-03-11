@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate } from '@/lib/hebrewDate'
+import { formatHebrewDate, getShabbatOrHolidayLabel, toHDate, MONTH_HE } from '@/lib/hebrewDate'
+import { yearToGematriya } from '@/lib/hebrewDate'
 
 // GET /api/statements?member_id=1 or ?member_ids=1,2,3
 // Returns unified financial data: charges, payments, purchases, balance per member
@@ -29,10 +30,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No members found' }, { status: 404 })
     }
 
+    const methodLabels: Record<string, string> = {
+      cash: 'מזומן',
+      bank: 'העברה בנקאית',
+      check: "צ'ק",
+      credit_card: 'כרטיס אשראי',
+    }
+
     const results = []
 
     for (const member of members) {
-      // Get charges
+      // Get charges (memberships)
       let chargesQ = supabase
         .from('member_charges')
         .select('id, description, amount, date, notes')
@@ -64,56 +72,90 @@ export async function GET(req: NextRequest) {
       const { data: payments } = await paymentsQ
 
       // Build unified line items sorted by date
+      // Each line has: lineType to distinguish membership/purchase/payment
+      // period: formatted period string for column 1
+      // description: formatted item description for column 2
       const lines: Array<{
         date: string
-        hebrewDate: string
+        period: string
         description: string
         charge: number
         payment: number
+        lineType: 'membership' | 'purchase' | 'payment'
       }> = []
 
+      // Memberships: period = Hebrew month+year, description = "דמי חבר"
       for (const c of charges ?? []) {
+        // Extract Hebrew month/year from the charge description if it follows "דמי חבר - MONTH YEAR" pattern
+        let period = ''
+        const feeMatch = c.description?.match(/דמי חבר\s*-\s*(.+)/)
+        if (feeMatch) {
+          period = feeMatch[1] // e.g. "תשרי תשפ״ו"
+        } else {
+          // Fallback: convert date to Hebrew month+year
+          try {
+            const hd = toHDate(c.date)
+            const monthName = MONTH_HE[hd.getMonth()] ?? ''
+            const yearStr = yearToGematriya(hd.getFullYear())
+            period = `${monthName} ${yearStr}`
+          } catch {
+            period = formatHebrewDate(c.date, 'he')
+          }
+        }
         lines.push({
           date: c.date,
-          hebrewDate: formatHebrewDate(c.date, 'he'),
-          description: c.description,
+          period,
+          description: 'דמי חבר',
           charge: Number(c.amount),
           payment: 0,
+          lineType: 'membership',
         })
       }
 
+      // Purchases: period = parasha/holiday label, description = item name (category)
       for (const p of purchases ?? []) {
         const pDate = (p as Record<string, unknown>).date as string
-        const desc = (p as Record<string, unknown>).description_he as string ||
+        const itemName = (p as Record<string, unknown>).description_he as string ||
           ((p as Record<string, unknown>).categories as { name_he: string } | null)?.name_he || 'רכישה'
+
+        // Get the week's parasha/holiday label for the period column
+        let period = ''
+        try {
+          // Find the Sunday of the week containing this date
+          const dateObj = new Date(pDate)
+          const dayOfWeek = dateObj.getDay()
+          const sunday = new Date(dateObj)
+          sunday.setDate(sunday.getDate() - dayOfWeek)
+          const sundayStr = sunday.toISOString().split('T')[0]
+          period = getShabbatOrHolidayLabel(sundayStr, 'he')
+        } catch {
+          period = formatHebrewDate(pDate, 'he')
+        }
+
         lines.push({
           date: pDate,
-          hebrewDate: formatHebrewDate(pDate, 'he'),
-          description: desc,
+          period,
+          description: itemName,
           charge: Number((p as Record<string, unknown>).amount),
           payment: 0,
+          lineType: 'purchase',
         })
       }
 
-      const methodLabels: Record<string, string> = {
-        cash: 'מזומן',
-        bank: 'העברה בנקאית',
-        check: "צ'ק",
-        credit_card: 'כרטיס אשראי',
-      }
-
+      // Payments: period = Gregorian date, description = "תשלום - method"
       for (const pay of payments ?? []) {
         const methodLabel = methodLabels[pay.method] || pay.method
         lines.push({
           date: pay.date,
-          hebrewDate: formatHebrewDate(pay.date, 'he'),
+          period: pay.date, // Gregorian date as-is
           description: `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`,
           charge: 0,
           payment: Number(pay.amount),
+          lineType: 'payment',
         })
       }
 
-      // Sort chronologically by date (follows Hebrew calendar order naturally)
+      // Sort chronologically by date
       lines.sort((a, b) => a.date.localeCompare(b.date))
 
       const totalCharged = lines.reduce((s, l) => s + l.charge, 0)

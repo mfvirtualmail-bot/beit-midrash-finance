@@ -10,6 +10,13 @@ function flattenTx(t: Record<string, unknown>) {
   }
 }
 
+const METHOD_LABELS: Record<string, string> = {
+  cash: 'מזומן',
+  bank: 'העברה בנקאית',
+  check: "צ'ק",
+  credit_card: 'כרטיס אשראי',
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -30,7 +37,46 @@ export async function GET(req: NextRequest) {
     if (search) q = q.or(`description_he.ilike.%${search}%,description_en.ilike.%${search}%,notes.ilike.%${search}%`)
 
     const { data } = await q
-    return NextResponse.json((data ?? []).map(flattenTx))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transactions: any[] = (data ?? []).map(flattenTx)
+
+    // Also fetch member payments and include them as income entries
+    // (unless filtering by expense-only or specific category)
+    if (type !== 'expense' && !category) {
+      let pq = supabase.from('member_payments')
+        .select('id, amount, date, method, reference, notes, member_id, members(name)')
+        .order('date', { ascending: false }).limit(limit)
+
+      if (month) pq = pq.gte('date', `${month}-01`).lte('date', `${month}-31`)
+      if (year) pq = pq.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`)
+      if (search) pq = pq.or(`notes.ilike.%${search}%,reference.ilike.%${search}%`)
+
+      const { data: payments } = await pq
+      for (const p of payments ?? []) {
+        const memberName = ((p.members as unknown) as { name: string } | null)?.name || ''
+        const methodLabel = METHOD_LABELS[p.method] || p.method
+        transactions.push({
+          id: `payment-${p.id}`,
+          type: 'income',
+          amount: Number(p.amount),
+          date: p.date,
+          description_he: `תשלום - ${memberName} - ${methodLabel}`,
+          description_en: `Payment - ${memberName} - ${methodLabel}`,
+          category_id: null,
+          category_name_he: 'תשלומי חברים',
+          category_name_en: 'Member Payments',
+          category_color: '#22c55e',
+          notes: p.notes || p.reference || null,
+          member_id: p.member_id,
+          is_member_payment: true,
+        })
+      }
+
+      // Re-sort combined list by date descending
+      transactions.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    }
+
+    return NextResponse.json(transactions)
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 

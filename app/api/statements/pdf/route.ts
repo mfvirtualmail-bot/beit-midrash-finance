@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate } from '@/lib/hebrewDate'
+import { formatHebrewDate, getShabbatOrHolidayLabel, toHDate, MONTH_HE, yearToGematriya } from '@/lib/hebrewDate'
 
 // GET /api/statements/pdf?member_ids=1,2,3&date_from=...&date_to=...
-// Returns an HTML page with all member statements, each on a separate print page
-// Optimized for A4 PDF output
+// Returns an HTML page optimized for A4 PDF output
+// With &download=1, returns Content-Disposition: attachment to trigger direct download
 export async function GET(req: NextRequest) {
   const memberIdsParam = req.nextUrl.searchParams.get('member_ids')
   const dateFrom = req.nextUrl.searchParams.get('date_from')
   const dateTo = req.nextUrl.searchParams.get('date_to')
+  const download = req.nextUrl.searchParams.get('download')
 
   if (!memberIdsParam) {
     return NextResponse.json({ error: 'member_ids required' }, { status: 400 })
@@ -85,23 +86,55 @@ export async function GET(req: NextRequest) {
     if (dateTo) paymentsQ = paymentsQ.lte('date', dateTo)
     const { data: payments } = await paymentsQ
 
-    // Build lines
-    const lines: Array<{ date: string; hebrewDate: string; description: string; charge: number; payment: number }> = []
+    // Build lines with proper period/description per type
+    const lines: Array<{ date: string; period: string; description: string; charge: number; payment: number }> = []
 
+    // Memberships: period = Hebrew month+year, description = "דמי חבר"
     for (const c of charges ?? []) {
-      lines.push({ date: c.date, hebrewDate: formatHebrewDate(c.date, 'he'), description: c.description, charge: Number(c.amount), payment: 0 })
+      let period = ''
+      const feeMatch = c.description?.match(/דמי חבר\s*-\s*(.+)/)
+      if (feeMatch) {
+        period = feeMatch[1]
+      } else {
+        try {
+          const hd = toHDate(c.date)
+          const monthName = MONTH_HE[hd.getMonth()] ?? ''
+          const yearStr = yearToGematriya(hd.getFullYear())
+          period = `${monthName} ${yearStr}`
+        } catch {
+          period = formatHebrewDate(c.date, 'he')
+        }
+      }
+      lines.push({ date: c.date, period, description: 'דמי חבר', charge: Number(c.amount), payment: 0 })
     }
+
+    // Purchases: period = parasha/holiday, description = item name
     for (const p of purchases ?? []) {
       const pDate = (p as Record<string, unknown>).date as string
-      const desc = (p as Record<string, unknown>).description_he as string ||
+      const itemName = (p as Record<string, unknown>).description_he as string ||
         ((p as Record<string, unknown>).categories as { name_he: string } | null)?.name_he || 'רכישה'
-      lines.push({ date: pDate, hebrewDate: formatHebrewDate(pDate, 'he'), description: desc, charge: Number((p as Record<string, unknown>).amount), payment: 0 })
+
+      let period = ''
+      try {
+        const dateObj = new Date(pDate)
+        const dayOfWeek = dateObj.getDay()
+        const sunday = new Date(dateObj)
+        sunday.setDate(sunday.getDate() - dayOfWeek)
+        const sundayStr = sunday.toISOString().split('T')[0]
+        period = getShabbatOrHolidayLabel(sundayStr, 'he')
+      } catch {
+        period = formatHebrewDate(pDate, 'he')
+      }
+
+      lines.push({ date: pDate, period, description: itemName, charge: Number((p as Record<string, unknown>).amount), payment: 0 })
     }
+
+    // Payments: period = Gregorian date, description = "תשלום - method"
     for (const pay of payments ?? []) {
       const methodLabel = methodLabels[pay.method] || pay.method
       lines.push({
         date: pay.date,
-        hebrewDate: formatHebrewDate(pay.date, 'he'),
+        period: pay.date,
         description: `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`,
         charge: 0,
         payment: Number(pay.amount),
@@ -117,7 +150,7 @@ export async function GET(req: NextRequest) {
     // Build rows HTML
     const rowsHtml = lines.map((line, i) => `
       <tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
-        <td style="padding:4px 10px;font-size:10px;color:#4b5563">${line.hebrewDate || line.date}</td>
+        <td style="padding:4px 10px;font-size:10px;color:#4b5563">${line.period}</td>
         <td style="padding:4px 10px;font-size:11px;font-weight:500">${line.description}</td>
         <td style="padding:4px 10px;font-size:11px;text-align:left;color:#dc2626;font-weight:500">${line.charge > 0 ? fmt(line.charge) : ''}</td>
         <td style="padding:4px 10px;font-size:11px;text-align:left;color:#15803d;font-weight:500">${line.payment > 0 ? fmt(line.payment) : ''}</td>
@@ -157,8 +190,8 @@ export async function GET(req: NextRequest) {
         <table>
           <thead>
             <tr>
-              <th style="text-align:right;width:18%">תאריך / תקופה</th>
-              <th style="text-align:right;width:42%">פריט / תיאור</th>
+              <th style="text-align:right;width:22%">תקופה / שבוע</th>
+              <th style="text-align:right;width:38%">פריט / תיאור</th>
               <th style="text-align:left;width:20%">חיוב (€)</th>
               <th style="text-align:left;width:20%">תשלום (€)</th>
             </tr>
@@ -238,6 +271,14 @@ export async function GET(req: NextRequest) {
     .statement-page { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 20px; }
   }
 </style>
+<script>
+// Auto-trigger print dialog for direct PDF download
+window.addEventListener('load', function() {
+  if (window.location.search.includes('download=1')) {
+    setTimeout(function() { window.print(); }, 500);
+  }
+});
+</script>
 </head>
 <body>
 <div class="no-print" style="text-align:center;padding:15px;background:#f3f4f6">

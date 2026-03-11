@@ -67,7 +67,7 @@ export default function StatementsPage() {
     if (selected.size === 0) return
     const ids = Array.from(selected).join(',')
     const range = hebrewYearToGregorianRange(selectedYear)
-    window.open(`/api/statements/pdf?member_ids=${ids}&date_from=${range.start}&date_to=${range.end}`, '_blank')
+    window.open(`/api/statements/pdf?member_ids=${ids}&date_from=${range.start}&date_to=${range.end}&download=1`, '_blank')
   }
 
   function viewStatement(memberId: number) {

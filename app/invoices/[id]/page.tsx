@@ -27,10 +27,12 @@ interface OrgSettings {
 
 interface StatementLine {
   date: string
-  hebrewDate: string
+  period: string
+  hebrewDate?: string
   description: string
   charge: number
   payment: number
+  lineType?: 'membership' | 'purchase' | 'payment'
 }
 
 interface StatementData {
@@ -97,13 +99,14 @@ export default function InvoiceDetailPage() {
         </h1>
         <div className="flex gap-2">
           {statementData?.member && (
-            <a
-              href={`/api/statements/pdf?member_ids=${statementData.member.id}&download=1`}
-              target="_blank"
+            <button
+              onClick={() => {
+                window.open(`/api/statements/pdf?member_ids=${statementData.member.id}&download=1`, '_blank')
+              }}
               className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium"
             >
               <Download size={15} /> {T.downloadPDF}
-            </a>
+            </button>
           )}
           <button onClick={() => window.print()} className="btn-primary flex items-center gap-2">
             <Printer size={16} /> {T.printInvoice}
@@ -167,8 +170,8 @@ export default function InvoiceDetailPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-blue-600 text-white">
-                  <th className="text-start py-2 px-3 font-semibold rounded-ss-lg" style={{ width: '20%' }}>{he ? 'תאריך / תקופה' : 'Date / Period'}</th>
-                  <th className="text-start py-2 px-3 font-semibold" style={{ width: '40%' }}>{he ? 'פריט / תיאור' : 'Item / Description'}</th>
+                  <th className="text-start py-2 px-3 font-semibold rounded-ss-lg" style={{ width: '22%' }}>{he ? 'תקופה / שבוע' : 'Period / Week'}</th>
+                  <th className="text-start py-2 px-3 font-semibold" style={{ width: '38%' }}>{he ? 'פריט / תיאור' : 'Item / Description'}</th>
                   <th className="text-end py-2 px-3 font-semibold" style={{ width: '20%' }}>{he ? 'חיוב (€)' : 'Charge (€)'}</th>
                   <th className="text-end py-2 px-3 font-semibold rounded-se-lg" style={{ width: '20%' }}>{he ? 'תשלום (€)' : 'Payment (€)'}</th>
                 </tr>
@@ -176,7 +179,7 @@ export default function InvoiceDetailPage() {
               <tbody>
                 {statementData!.lines.map((line, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="py-1.5 px-3 text-gray-600" dir="rtl">{line.hebrewDate || line.date}</td>
+                    <td className="py-1.5 px-3 text-gray-600" dir="rtl">{line.period || line.hebrewDate || line.date}</td>
                     <td className="py-1.5 px-3 font-medium text-gray-800">{line.description}</td>
                     <td className="py-1.5 px-3 text-end text-red-600">{line.charge > 0 ? fmt(line.charge) : ''}</td>
                     <td className="py-1.5 px-3 text-end text-green-600">{line.payment > 0 ? fmt(line.payment) : ''}</td>
