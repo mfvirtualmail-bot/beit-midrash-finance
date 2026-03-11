@@ -67,7 +67,7 @@ const GEMATRIA_HUNDREDS: Record<number, string> = { 1:'ק', 2:'ר', 3:'ש', 4:'�
 const GEMATRIA_TENS: Record<number, string> = { 1:'י', 2:'כ', 3:'ל', 4:'מ', 5:'נ', 6:'ס', 7:'ע', 8:'פ', 9:'צ' }
 const GEMATRIA_ONES: Record<number, string> = { 1:'א', 2:'ב', 3:'ג', 4:'ד', 5:'ה', 6:'ו', 7:'ז', 8:'ח', 9:'ט' }
 
-function yearToGematriya(year: number): string {
+export function yearToGematriya(year: number): string {
   // Remove thousands (5786 → 786)
   const shortYear = year % 1000
   const h = Math.floor(shortYear / 100)

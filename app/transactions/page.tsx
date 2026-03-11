@@ -37,7 +37,9 @@ export default function TransactionsPage() {
   }
   async function deleteSelected() {
     if (!confirm(T.confirmDelete)) return
-    await Promise.all(Array.from(selected).map(id => fetch(`/api/transactions/${id}`, { method: 'DELETE' })))
+    // Only delete real transactions, not member payment entries
+    const realIds = Array.from(selected).filter(id => !String(id).startsWith('payment-'))
+    await Promise.all(realIds.map(id => fetch(`/api/transactions/${id}`, { method: 'DELETE' })))
     setSelected(new Set())
     loadData()
   }
@@ -234,10 +236,14 @@ export default function TransactionsPage() {
                       {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => openEdit(tx)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600"><Pencil size={14} /></button>
-                        <button onClick={() => setDeleteId(tx.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Trash2 size={14} /></button>
-                      </div>
+                      {String(tx.id).startsWith('payment-') ? (
+                        <span className="text-xs text-gray-400">{lang === 'he' ? 'תשלום חבר' : 'Payment'}</span>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => openEdit(tx)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600"><Pencil size={14} /></button>
+                          <button onClick={() => setDeleteId(tx.id)} className="p-1.5 rounded hover:bg-red-50 text-red-500"><Trash2 size={14} /></button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
