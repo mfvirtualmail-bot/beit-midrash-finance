@@ -28,6 +28,80 @@ function normalizeMethod(m: string): string {
   return 'cash'
 }
 
+// Parse dates in any common format → YYYY-MM-DD
+// Supports: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, MM/DD/YYYY, YYYY-MM-DD, YYYY/MM/DD, Excel serial numbers
+function parseDate(value: string | number): string | null {
+  // Excel serial number (e.g. 46052)
+  if (typeof value === 'number' || /^\d{4,5}$/.test(String(value).trim())) {
+    const serial = typeof value === 'number' ? value : parseInt(String(value).trim(), 10)
+    if (serial > 1 && serial < 200000) {
+      // Excel epoch: Jan 0, 1900 (with the intentional leap year bug)
+      const epoch = new Date(1899, 11, 30)
+      const date = new Date(epoch.getTime() + serial * 86400000)
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0]
+      }
+    }
+  }
+
+  const s = String(value).trim()
+  if (!s) return null
+
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number)
+    if (isValidDate(y, m, d)) return formatDate(y, m, d)
+    return null
+  }
+
+  // YYYY/MM/DD
+  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)) {
+    const [y, m, d] = s.split('/').map(Number)
+    if (isValidDate(y, m, d)) return formatDate(y, m, d)
+    return null
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const match = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/)
+  if (match) {
+    const a = parseInt(match[1], 10)
+    const b = parseInt(match[2], 10)
+    const year = parseInt(match[3], 10)
+
+    // If first number > 12, it must be DD/MM/YYYY
+    if (a > 12) {
+      if (isValidDate(year, b, a)) return formatDate(year, b, a)
+      return null
+    }
+    // If second number > 12, it must be MM/DD/YYYY
+    if (b > 12) {
+      if (isValidDate(year, a, b)) return formatDate(year, a, b)
+      return null
+    }
+    // Both <= 12: assume DD/MM/YYYY (European/Israeli format)
+    if (isValidDate(year, b, a)) return formatDate(year, b, a)
+    return null
+  }
+
+  // Try native Date.parse as last resort
+  const d = new Date(s)
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0]
+  }
+
+  return null
+}
+
+function isValidDate(y: number, m: number, d: number): boolean {
+  if (y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return false
+  const date = new Date(y, m - 1, d)
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
+}
+
+function formatDate(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
 export async function POST(req: NextRequest) {
   try {
     const userId = await getSessionUser(req.cookies.get(COOKIE_NAME)?.value)
@@ -38,7 +112,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     const workbook = XLSX.read(buffer, { type: 'buffer' })
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
-    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '' })
+    const rows = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, { defval: '', raw: true })
 
     if (rows.length === 0) return NextResponse.json({ error: 'Empty file', imported: 0 })
 
@@ -90,7 +164,17 @@ export async function POST(req: NextRequest) {
       }
 
       const method = r.method ? normalizeMethod(r.method) : 'cash'
-      const date = r.date || defaultDate
+
+      // Parse date - handle all common formats
+      let date = defaultDate
+      if (r.date) {
+        const parsed = parseDate(r.date)
+        if (!parsed) {
+          skipped.push(`Row ${i + 2}: invalid date format "${r.date}"`)
+          continue
+        }
+        date = parsed
+      }
 
       payments.push({
         member_id: memberId,
@@ -107,13 +191,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No valid rows found', imported: 0, total: normalized.length, skipped }, { status: 400 })
     }
 
-    // Insert in batches
+    // Insert one-by-one so partial failures don't block other rows
     let imported = 0
-    for (let i = 0; i < payments.length; i += 50) {
-      const batch = payments.slice(i, i + 50)
-      const { data, error } = await supabase.from('member_payments').insert(batch).select('id')
-      if (!error) imported += (data ?? []).length
-      else skipped.push(error.message)
+    for (let i = 0; i < payments.length; i++) {
+      const { error } = await supabase.from('member_payments').insert(payments[i]).select('id')
+      if (!error) {
+        imported++
+      } else {
+        skipped.push(`Row: ${payments[i].notes || payments[i].date} — ${error.message}`)
+      }
     }
 
     return NextResponse.json({ imported, total: normalized.length, skipped })

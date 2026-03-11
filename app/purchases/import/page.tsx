@@ -25,8 +25,14 @@ export default function PurchasesImportPage() {
     const r = await fetch('/api/purchases/import', { method: 'POST', body: fd })
     const data = await r.json()
     setUploading(false)
-    if (!r.ok || data.error) { setError(data.error || T.error); return }
-    setResult(data)
+    if (data.imported > 0) {
+      setResult(data)
+    } else if (!r.ok || data.error) {
+      setError(data.error || T.error)
+      if (data.skipped?.length) setResult(data)
+    } else {
+      setResult(data)
+    }
   }
 
   return (
