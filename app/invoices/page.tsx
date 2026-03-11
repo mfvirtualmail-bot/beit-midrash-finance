@@ -1,9 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { Member } from '@/lib/db'
 import { getCurrentHebrewYear, getRecentHebrewYears, hebrewYearToGregorianRange } from '@/lib/hebrewDate'
-import { FileText, Eye, Download, Search, Zap, CheckCircle } from 'lucide-react'
+import { generatePdfFromElement, generateMultiMemberPdf, downloadBlob, createPdfPreviewUrl } from '@/lib/pdfGenerator'
+import { FileText, Eye, Download, Search, Zap, CheckCircle, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function StatementsPage() {
@@ -24,6 +25,14 @@ export default function StatementsPage() {
   const [genLoading, setGenLoading] = useState(false)
   const [genResult, setGenResult] = useState<{ count: number; invoices: { id: number; member: string; total: number; email: string | null }[] } | null>(null)
 
+  // PDF preview modal
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [pdfGenerating, setPdfGenerating] = useState(false)
+  const [previewMemberIds, setPreviewMemberIds] = useState<number[]>([])
+  const [previewMemberName, setPreviewMemberName] = useState('')
+  const renderContainerRef = useRef<HTMLDivElement>(null)
+
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   async function load() {
@@ -35,6 +44,11 @@ export default function StatementsPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }
+  }, [previewUrl])
 
   function toggleSelect(id: number) {
     setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
@@ -63,20 +77,102 @@ export default function StatementsPage() {
     setGenLoading(false)
   }
 
-  function downloadBulkPDF() {
-    if (selected.size === 0) return
-    const ids = Array.from(selected).join(',')
-    const range = hebrewYearToGregorianRange(selectedYear)
-    window.open(`/api/statements/pdf?member_ids=${ids}&date_from=${range.start}&date_to=${range.end}&download=1`, '_blank')
+  // Generate PDF from HTML rendered in hidden container
+  const generatePdf = useCallback(async (memberIds: number[], forDownload: boolean, memberName?: string) => {
+    setPdfGenerating(true)
+    try {
+      const range = hebrewYearToGregorianRange(selectedYear)
+      const ids = memberIds.join(',')
+
+      // Fetch the HTML from the API
+      const res = await fetch(`/api/statements/pdf?member_ids=${ids}&date_from=${range.start}&date_to=${range.end}`)
+      const html = await res.text()
+
+      // Create a hidden iframe to render the HTML
+      const iframe = document.createElement('iframe')
+      iframe.style.position = 'fixed'
+      iframe.style.left = '-9999px'
+      iframe.style.top = '0'
+      iframe.style.width = '800px'
+      iframe.style.height = '1200px'
+      iframe.style.border = 'none'
+      document.body.appendChild(iframe)
+
+      // Write HTML to iframe
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+      if (!iframeDoc) throw new Error('Cannot access iframe document')
+      iframeDoc.open()
+      iframeDoc.write(html)
+      iframeDoc.close()
+
+      // Wait for images to load
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      // Get all statement pages from iframe
+      const pages = iframeDoc.querySelectorAll('.statement-page')
+
+      let pdfBlob: Blob
+      if (pages.length > 1) {
+        const elements = Array.from(pages) as HTMLElement[]
+        pdfBlob = await generateMultiMemberPdf(elements, '')
+      } else if (pages.length === 1) {
+        pdfBlob = await generatePdfFromElement(pages[0] as HTMLElement, '')
+      } else {
+        // Fallback: render the body
+        pdfBlob = await generatePdfFromElement(iframeDoc.body, '')
+      }
+
+      // Clean up iframe
+      document.body.removeChild(iframe)
+
+      if (forDownload) {
+        const today = new Date().toISOString().split('T')[0]
+        const filename = memberIds.length === 1 && memberName
+          ? `Statement_${memberName.replace(/\s+/g, '_')}_${today}.pdf`
+          : `Statements_${today}.pdf`
+        downloadBlob(pdfBlob, filename)
+      } else {
+        // Preview in modal
+        if (previewUrl) URL.revokeObjectURL(previewUrl)
+        const url = createPdfPreviewUrl(pdfBlob)
+        setPreviewUrl(url)
+        setPreviewMemberIds(memberIds)
+        setPreviewMemberName(memberName || '')
+        setShowPreview(true)
+      }
+    } catch (err) {
+      console.error('PDF generation failed:', err)
+      alert(he ? 'שגיאה ביצירת PDF' : 'PDF generation failed')
+    } finally {
+      setPdfGenerating(false)
+    }
+  }, [selectedYear, he, previewUrl])
+
+  function viewStatement(memberId: number, memberName: string) {
+    generatePdf([memberId], false, memberName)
   }
 
-  function viewStatement(memberId: number) {
-    const range = hebrewYearToGregorianRange(selectedYear)
-    window.open(`/api/statements/pdf?member_ids=${memberId}&date_from=${range.start}&date_to=${range.end}`, '_blank')
+  function downloadStatement(memberId: number, memberName: string) {
+    generatePdf([memberId], true, memberName)
+  }
+
+  function downloadBulkPDF() {
+    if (selected.size === 0) return
+    const ids = Array.from(selected)
+    generatePdf(ids, true)
+  }
+
+  function downloadFromPreview() {
+    if (!previewUrl || !previewMemberIds.length) return
+    // Re-generate for download
+    generatePdf(previewMemberIds, true, previewMemberName)
   }
 
   return (
     <div className="space-y-6">
+      {/* Hidden container for PDF rendering */}
+      <div ref={renderContainerRef} style={{ position: 'fixed', left: '-9999px', top: 0 }} />
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -92,6 +188,14 @@ export default function StatementsPage() {
           </button>
         </div>
       </div>
+
+      {/* PDF generating indicator */}
+      {pdfGenerating && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-blue-700">
+          <Loader2 size={16} className="animate-spin" />
+          {he ? 'מייצר PDF...' : 'Generating PDF...'}
+        </div>
+      )}
 
       {/* Year selector + Search */}
       <div className="flex gap-3 flex-wrap items-center">
@@ -126,7 +230,8 @@ export default function StatementsPage() {
           <div className="flex gap-2">
             <button
               onClick={downloadBulkPDF}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-medium"
+              disabled={pdfGenerating}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-medium disabled:opacity-50"
             >
               <Download size={14} /> {he ? 'הורד הנבחרים' : 'Download Selected'}
             </button>
@@ -164,7 +269,11 @@ export default function StatementsPage() {
                   <td className="px-2 py-3">
                     <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggleSelect(m.id)} className="rounded" />
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-800">{m.name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link href={`/members/${m.id}`} className="text-blue-700 hover:text-blue-900 hover:underline">
+                      {m.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-end text-red-600 hidden sm:table-cell">{fmt(m.total_fees ?? 0)}</td>
                   <td className="px-4 py-3 text-end text-orange-600 hidden sm:table-cell">{fmt(m.total_purchases ?? 0)}</td>
                   <td className="px-4 py-3 text-end text-green-600">{fmt(m.total_payments ?? 0)}</td>
@@ -176,18 +285,17 @@ export default function StatementsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => viewStatement(m.id)}
-                        className="p-1.5 hover:bg-blue-100 text-blue-600 rounded-lg"
-                        title={he ? 'צפה בדף חשבון' : 'View Statement'}
+                        onClick={() => viewStatement(m.id, m.name)}
+                        disabled={pdfGenerating}
+                        className="p-1.5 hover:bg-blue-100 text-blue-600 rounded-lg disabled:opacity-50"
+                        title={he ? 'תצוגה מקדימה' : 'Preview'}
                       >
                         <Eye size={15} />
                       </button>
                       <button
-                        onClick={() => {
-                          const range = hebrewYearToGregorianRange(selectedYear)
-                          window.open(`/api/statements/pdf?member_ids=${m.id}&date_from=${range.start}&date_to=${range.end}&download=1`, '_blank')
-                        }}
-                        className="p-1.5 hover:bg-green-100 text-green-600 rounded-lg"
+                        onClick={() => downloadStatement(m.id, m.name)}
+                        disabled={pdfGenerating}
+                        className="p-1.5 hover:bg-green-100 text-green-600 rounded-lg disabled:opacity-50"
                         title={he ? 'הורד PDF' : 'Download PDF'}
                       >
                         <Download size={15} />
@@ -200,6 +308,44 @@ export default function StatementsPage() {
           </table>
         )}
       </div>
+
+      {/* PDF Preview Modal */}
+      {showPreview && previewUrl && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <FileText size={20} className="text-blue-600" />
+                {he ? 'תצוגה מקדימה' : 'PDF Preview'}
+                {previewMemberName && <span className="text-gray-500 text-sm ms-2">— {previewMemberName}</span>}
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={downloadFromPreview}
+                  disabled={pdfGenerating}
+                  className="flex items-center gap-2 text-sm px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl font-medium disabled:opacity-50"
+                >
+                  <Download size={15} />
+                  {he ? 'הורד PDF' : 'Download PDF'}
+                </button>
+                <button
+                  onClick={() => { setShowPreview(false); if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl('') }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden bg-gray-100 p-4">
+              <iframe
+                src={previewUrl}
+                className="w-full h-full rounded-lg border border-gray-300 bg-white"
+                title="PDF Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Generate Statements Modal */}
       {showGenModal && (

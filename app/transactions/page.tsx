@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { Plus, Pencil, Trash2, Search, X } from 'lucide-react'
+import Link from 'next/link'
 import type { Transaction, Category } from '@/lib/db'
 
 const COLORS = ['#22c55e','#16a34a','#ef4444','#dc2626','#f97316','#a855f7','#f59e0b','#3b82f6','#6b7280','#14b8a6']
@@ -237,7 +238,7 @@ export default function TransactionsPage() {
                     </td>
                     <td className="px-4 py-3">
                       {String(tx.id).startsWith('payment-') ? (
-                        <span className="text-xs text-gray-400">{lang === 'he' ? 'תשלום חבר' : 'Payment'}</span>
+                        <Link href={`/members/${tx.member_id}`} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">{lang === 'he' ? 'תשלום חבר →' : 'Payment →'}</Link>
                       ) : (
                         <div className="flex items-center justify-center gap-2">
                           <button onClick={() => openEdit(tx)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600"><Pencil size={14} /></button>

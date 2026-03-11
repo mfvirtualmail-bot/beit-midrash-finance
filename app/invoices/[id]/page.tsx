@@ -1,10 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
 import { Invoice } from '@/lib/db'
 import { formatHebrewDate } from '@/lib/hebrewDate'
-import { ArrowRight, Printer, Download } from 'lucide-react'
+import { generatePdfFromElement, downloadBlob, createPdfPreviewUrl } from '@/lib/pdfGenerator'
+import { ArrowRight, Download, Eye, X, Loader2 } from 'lucide-react'
+import Link from 'next/link'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
@@ -52,6 +54,9 @@ export default function InvoiceDetailPage() {
   const [settings, setSettings] = useState<OrgSettings | null>(null)
   const [statementData, setStatementData] = useState<StatementData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pdfGenerating, setPdfGenerating] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -61,7 +66,6 @@ export default function InvoiceDetailPage() {
       setInvoice(invData)
       setSettings(settingsData)
 
-      // If invoice has a member, load statement data
       if (invData.member_id) {
         const stRes = await fetch(`/api/statements?member_id=${invData.member_id}`)
         const stData = await stRes.json()
@@ -72,8 +76,59 @@ export default function InvoiceDetailPage() {
     })
   }, [params.id])
 
+  useEffect(() => {
+    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }
+  }, [previewUrl])
+
   const fmt = (n: number) => `€${n.toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const statusLabel = (s: string) => ({ draft: T.draft, sent: T.sent, paid: T.paid, cancelled: T.cancelled }[s] ?? s)
+
+  const generatePdf = useCallback(async (forDownload: boolean) => {
+    if (!statementData?.member) return
+    setPdfGenerating(true)
+    try {
+      const res = await fetch(`/api/statements/pdf?member_ids=${statementData.member.id}`)
+      const html = await res.text()
+
+      const iframe = document.createElement('iframe')
+      iframe.style.position = 'fixed'
+      iframe.style.left = '-9999px'
+      iframe.style.top = '0'
+      iframe.style.width = '800px'
+      iframe.style.height = '1200px'
+      iframe.style.border = 'none'
+      document.body.appendChild(iframe)
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+      if (!iframeDoc) throw new Error('Cannot access iframe document')
+      iframeDoc.open()
+      iframeDoc.write(html)
+      iframeDoc.close()
+
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      const page = iframeDoc.querySelector('.statement-page') as HTMLElement || iframeDoc.body
+      const pdfBlob = await generatePdfFromElement(page, '')
+
+      document.body.removeChild(iframe)
+
+      if (forDownload) {
+        const today = new Date().toISOString().split('T')[0]
+        const name = statementData.member.name.replace(/\s+/g, '_')
+        downloadBlob(pdfBlob, `Statement_${name}_${today}.pdf`)
+      } else {
+        if (previewUrl) URL.revokeObjectURL(previewUrl)
+        const url = createPdfPreviewUrl(pdfBlob)
+        setPreviewUrl(url)
+        setShowPreview(true)
+      }
+    } catch (err) {
+      console.error('PDF generation failed:', err)
+      alert(he ? 'שגיאה ביצירת PDF' : 'PDF generation failed')
+    } finally {
+      setPdfGenerating(false)
+    }
+  }, [statementData, he, previewUrl])
 
   if (loading) return <div className="text-center py-16 text-gray-400">{T.loading}</div>
   if (!invoice) return <div className="text-center py-16 text-gray-400">{T.error}</div>
@@ -83,14 +138,12 @@ export default function InvoiceDetailPage() {
   const headerText = he ? settings?.invoice_header_he : settings?.invoice_header_en
   const footerText = he ? settings?.invoice_footer_he : settings?.invoice_footer_en
   const orgName = he ? orgNameHe : orgNameEn
-
-  // Use statement data if available, otherwise fall back to invoice items
   const hasStatement = !!statementData && statementData.lines.length > 0
 
   return (
     <div className="space-y-6">
       {/* Action bar */}
-      <div className="flex items-center gap-3 print:hidden flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap">
         <button onClick={() => router.push('/invoices')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
           <ArrowRight size={20} className={isRTL ? '' : 'rotate-180'} />
         </button>
@@ -99,25 +152,32 @@ export default function InvoiceDetailPage() {
         </h1>
         <div className="flex gap-2">
           {statementData?.member && (
-            <button
-              onClick={() => {
-                window.open(`/api/statements/pdf?member_ids=${statementData.member.id}&download=1`, '_blank')
-              }}
-              className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium"
-            >
-              <Download size={15} /> {T.downloadPDF}
-            </button>
+            <>
+              <button
+                onClick={() => generatePdf(false)}
+                disabled={pdfGenerating}
+                className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium disabled:opacity-50"
+              >
+                {pdfGenerating ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
+                {he ? 'תצוגה מקדימה' : 'Preview PDF'}
+              </button>
+              <button
+                onClick={() => generatePdf(true)}
+                disabled={pdfGenerating}
+                className="flex items-center gap-2 text-sm px-3 py-2 bg-green-50 border border-green-300 text-green-800 hover:bg-green-100 rounded-xl font-medium disabled:opacity-50"
+              >
+                {pdfGenerating ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                {T.downloadPDF}
+              </button>
+            </>
           )}
-          <button onClick={() => window.print()} className="btn-primary flex items-center gap-2">
-            <Printer size={16} /> {T.printInvoice}
-          </button>
         </div>
       </div>
 
-      {/* Printable statement */}
+      {/* Statement content */}
       <div
         id="invoice-print"
-        className="bg-white rounded-2xl shadow-sm border border-gray-200 max-w-3xl mx-auto print:shadow-none print:border-0 print:rounded-none print:max-w-full"
+        className="bg-white rounded-2xl shadow-sm border border-gray-200 max-w-3xl mx-auto"
         dir={isRTL ? 'rtl' : 'ltr'}
       >
         {/* Header */}
@@ -155,7 +215,13 @@ export default function InvoiceDetailPage() {
               {(invoice.member_name || invoice.donor_name_he) && (
                 <div>
                   <span className="text-gray-500">{T.recipient}: </span>
-                  <span className="font-bold text-gray-800">{invoice.member_name || invoice.donor_name_he}</span>
+                  {invoice.member_id ? (
+                    <Link href={`/members/${invoice.member_id}`} className="font-bold text-blue-700 hover:text-blue-900 hover:underline">
+                      {invoice.member_name || invoice.donor_name_he}
+                    </Link>
+                  ) : (
+                    <span className="font-bold text-gray-800">{invoice.member_name || invoice.donor_name_he}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -165,7 +231,7 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
 
-          {/* 4-column table: Date/Period | Item/Description | Charge | Payment */}
+          {/* 4-column statement table */}
           {hasStatement ? (
             <table className="w-full text-xs">
               <thead>
@@ -258,7 +324,7 @@ export default function InvoiceDetailPage() {
 
         {/* Footer */}
         {(footerText || settings?.org_phone || settings?.org_email) && (
-          <div className="border-t-2 border-gray-200 px-6 py-4 bg-gray-50 rounded-b-2xl print:rounded-none">
+          <div className="border-t-2 border-gray-200 px-6 py-4 bg-gray-50 rounded-b-2xl">
             {footerText && <div className="text-xs text-gray-600 whitespace-pre-line">{footerText}</div>}
             {!footerText && (settings?.org_phone || settings?.org_email) && (
               <div className="text-xs text-gray-500 text-center">
@@ -269,29 +335,42 @@ export default function InvoiceDetailPage() {
         )}
       </div>
 
-      <style>{`
-        @media print {
-          .print\\:hidden { display: none !important; }
-          body { margin: 0; padding: 0; background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          html { background: white !important; }
-          nav, header, aside, footer:not(#invoice-print footer) { display: none !important; }
-          main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
-          #invoice-print {
-            box-shadow: none !important;
-            border: none !important;
-            border-radius: 0 !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            font-size: 10pt;
-          }
-          #invoice-print * { border-radius: 0 !important; }
-          #invoice-print table thead tr { background-color: #2563eb !important; color: white !important; }
-          #invoice-print table tfoot tr.bg-blue-600 { background-color: #2563eb !important; color: white !important; }
-          #invoice-print table thead th, #invoice-print table tfoot tr.bg-blue-600 td { color: white !important; }
-          @page { size: A4; margin: 10mm 15mm; }
-          #invoice-print table tr { page-break-inside: avoid; }
-        }
-      `}</style>
+      {/* PDF Preview Modal */}
+      {showPreview && previewUrl && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Eye size={20} className="text-blue-600" />
+                {he ? 'תצוגה מקדימה' : 'PDF Preview'}
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => generatePdf(true)}
+                  disabled={pdfGenerating}
+                  className="flex items-center gap-2 text-sm px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl font-medium disabled:opacity-50"
+                >
+                  <Download size={15} />
+                  {he ? 'הורד PDF' : 'Download PDF'}
+                </button>
+                <button
+                  onClick={() => { setShowPreview(false); if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl('') }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden bg-gray-100 p-4">
+              <iframe
+                src={previewUrl}
+                className="w-full h-full rounded-lg border border-gray-300 bg-white"
+                title="PDF Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
