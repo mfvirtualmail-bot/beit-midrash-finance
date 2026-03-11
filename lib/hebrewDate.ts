@@ -228,4 +228,192 @@ export function getRecentHebrewYears(): Array<{ year: number; label: string }> {
   return years
 }
 
+// === Hebrew Calendar Period Ordering ===
+// This defines the canonical order of periods in a Hebrew year.
+// Used to sort statement lines in proper Hebrew calendar sequence.
+// Can be extended with additional items — they will be sorted in the order listed here.
+export const HEBREW_CALENDAR_ORDER: string[] = [
+  // תשרי (Tishrei)
+  'תשרי',
+  'ראש השנה',
+  'צום גדליה',
+  'יום כיפור',
+  'סוכות',
+  'הושענא רבה',
+  'שמחת תורה',
+  'שמיני עצרת',
+  'פרשת בראשית',
+  // חשוון (Cheshvan)
+  'חשוון',
+  'פרשת נח',
+  'פרשת לך לך',
+  'פרשת וירא',
+  'פרשת חיי שרה',
+  // כסלו (Kislev)
+  'כסלו',
+  'פרשת תולדות',
+  'פרשת ויצא',
+  'פרשת וישלח',
+  'פרשת וישב',
+  'חנוכה',
+  // טבת (Tevet)
+  'טבת',
+  'פרשת מקץ',
+  'פרשת ויגש',
+  'פרשת ויחי',
+  'עשרה בטבת',
+  // שבט (Shevat)
+  'שבט',
+  'פרשת שמות',
+  'פרשת וארא',
+  'פרשת בא',
+  'פרשת בשלח',
+  'ט"ו בשבט',
+  'פרשת יתרו',
+  'פרשת משפטים',
+  // אדר (Adar)
+  'אדר',
+  'אדר א׳',
+  'אדר ב׳',
+  'פרשת תרומה',
+  'פרשת תצוה',
+  'תענית אסתר',
+  'פורים',
+  'פרשת כי תשא',
+  'פרשת ויקהל',
+  'פרשת פקודי',
+  // ניסן (Nissan)
+  'ניסן',
+  'פרשת ויקרא',
+  'פרשת צו',
+  'פסח',
+  'פרשת שמיני',
+  // אייר (Iyar)
+  'אייר',
+  'פרשת תזריע',
+  'פרשת מצורע',
+  'פרשת אחרי מות',
+  'פרשת קדושים',
+  'ל"ג בעומר',
+  // סיוון (Sivan)
+  'סיוון',
+  'פרשת אמור',
+  'פרשת בהר',
+  'פרשת בחוקותי',
+  'שבועות',
+  'פרשת במדבר',
+  // תמוז (Tammuz)
+  'תמוז',
+  'פרשת נשא',
+  'פרשת בהעלותך',
+  'פרשת שלח',
+  'פרשת קרח',
+  'י"ז בתמוז',
+  // אב (Av)
+  'אב',
+  'פרשת חקת',
+  'פרשת בלק',
+  'פרשת פינחס',
+  'פרשת מטות',
+  'פרשת מסעי',
+  'תשעה באב',
+  'פרשת דברים',
+  // אלול (Elul)
+  'אלול',
+  'פרשת ואתחנן',
+  'פרשת עקב',
+  'פרשת ראה',
+  'פרשת שופטים',
+  'פרשת כי תצא',
+  'פרשת כי תבוא',
+  'פרשת נצבים',
+  'פרשת וילך',
+  'פרשת האזינו',
+]
+
+// Map Hebrew month names to their starting index in HEBREW_CALENDAR_ORDER
+const MONTH_TO_ORDER_INDEX: Record<string, number> = {}
+const MONTH_NAMES_IN_ORDER = [
+  'תשרי', 'חשוון', 'כסלו', 'טבת', 'שבט', 'אדר', 'אדר א׳', 'אדר ב׳',
+  'ניסן', 'אייר', 'סיוון', 'תמוז', 'אב', 'אלול',
+]
+for (const name of MONTH_NAMES_IN_ORDER) {
+  const idx = HEBREW_CALENDAR_ORDER.indexOf(name)
+  if (idx >= 0) MONTH_TO_ORDER_INDEX[name] = idx
+}
+
+/**
+ * Get the sort index for a Hebrew period string.
+ * Returns a number for sorting statement lines in Hebrew calendar order.
+ * Lower = earlier in the year (Tishrei first, Elul last).
+ */
+export function getHebrewPeriodSortIndex(period: string): number {
+  if (!period) return 9999
+
+  // Try exact match first
+  const exactIdx = HEBREW_CALENDAR_ORDER.indexOf(period)
+  if (exactIdx >= 0) return exactIdx
+
+  // Try to find a match (period may include year, e.g. "תשרי תשפ״ו")
+  // Or may have combined parshiot like "פרשת ויקהלפקודי"
+  for (let i = 0; i < HEBREW_CALENDAR_ORDER.length; i++) {
+    const entry = HEBREW_CALENDAR_ORDER[i]
+    if (period.includes(entry) || entry.includes(period)) return i
+    // Handle "Parashat X" without the "פרשת " prefix
+    if (entry.startsWith('פרשת ') && period.includes(entry.slice(5))) return i
+  }
+
+  // Try to match combined parshiot (e.g. "פרשת ויקהלפקודי" → "פרשת ויקהל")
+  for (let i = 0; i < HEBREW_CALENDAR_ORDER.length; i++) {
+    const entry = HEBREW_CALENDAR_ORDER[i]
+    if (entry.startsWith('פרשת ')) {
+      const parashaName = entry.slice(5) // Remove "פרשת "
+      if (period.includes(parashaName)) return i
+    }
+  }
+
+  // Try to find the Hebrew month from the period text
+  for (const monthName of MONTH_NAMES_IN_ORDER) {
+    if (period.includes(monthName)) {
+      // Place at the month's position (membership line)
+      return MONTH_TO_ORDER_INDEX[monthName] ?? 9999
+    }
+  }
+
+  return 9999
+}
+
+/**
+ * Get sort index for a payment by its Gregorian date.
+ * Converts to Hebrew date, finds the month, returns index after
+ * the last item in that month (so payments appear after charges/purchases).
+ */
+export function getPaymentSortIndex(gregorianDate: string): number {
+  try {
+    const hd = toHDate(gregorianDate)
+    const monthNum = hd.getMonth()
+    const monthName = MONTH_HE[monthNum]
+    if (!monthName) return 9999
+
+    // Find the last item index for this month
+    const monthIdx = MONTH_TO_ORDER_INDEX[monthName]
+    if (monthIdx === undefined) return 9999
+
+    // Find next month's start index (or end of list)
+    let nextMonthIdx = HEBREW_CALENDAR_ORDER.length
+    for (const name of MONTH_NAMES_IN_ORDER) {
+      const idx = MONTH_TO_ORDER_INDEX[name]
+      if (idx !== undefined && idx > monthIdx) {
+        nextMonthIdx = idx
+        break
+      }
+    }
+
+    // Place payment at end of this month's items (with 0.5 offset so it sorts after)
+    return nextMonthIdx - 0.5
+  } catch {
+    return 9999
+  }
+}
+
 export { MONTH_HE, MONTH_EN, MONTH_ORDER }

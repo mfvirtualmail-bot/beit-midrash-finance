@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
 
 // GET /api/statements/pdf?member_ids=1,2,3&date_from=...&date_to=...
 // Returns an HTML page optimized for A4 PDF output
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
     const { data: payments } = await paymentsQ
 
     // Build lines with proper period/description per type
-    const lines: Array<{ date: string; period: string; description: string; charge: number; payment: number }> = []
+    const lines: Array<{ date: string; period: string; description: string; charge: number; payment: number; lineType?: 'membership' | 'purchase' | 'payment' }> = []
 
     // Memberships: period = Hebrew month+year, description = "דמי חבר"
     for (const c of charges ?? []) {
@@ -133,19 +133,27 @@ export async function GET(req: NextRequest) {
       lines.push({ date: pDate, period, description: itemName, charge: Number((p as Record<string, unknown>).amount), payment: 0 })
     }
 
-    // Payments: period = Gregorian date, description = "תשלום - method"
+    // Payments: period = Hebrew date, description = "תשלום - method"
     for (const pay of payments ?? []) {
       const methodLabel = methodLabels[pay.method] || pay.method
+      const hebrewDate = formatHebrewDate(pay.date, 'he')
       lines.push({
         date: pay.date,
-        period: pay.date,
+        period: hebrewDate,
         description: `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`,
         charge: 0,
         payment: Number(pay.amount),
+        lineType: 'payment' as const,
       })
     }
 
-    lines.sort((a, b) => a.date.localeCompare(b.date))
+    // Sort by Hebrew calendar order (Tishrei → Elul)
+    lines.sort((a, b) => {
+      const idxA = (a as { lineType?: string }).lineType === 'payment' ? getPaymentSortIndex(a.date) : getHebrewPeriodSortIndex(a.period)
+      const idxB = (b as { lineType?: string }).lineType === 'payment' ? getPaymentSortIndex(b.date) : getHebrewPeriodSortIndex(b.period)
+      if (idxA !== idxB) return idxA - idxB
+      return a.date.localeCompare(b.date)
+    })
 
     const totalCharged = lines.reduce((s, l) => s + l.charge, 0)
     const totalPaid = lines.reduce((s, l) => s + l.payment, 0)

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate, toHDate, MONTH_HE } from '@/lib/hebrewDate'
-import { yearToGematriya } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
 
 // GET /api/statements?member_id=1 or ?member_ids=1,2,3
 // Returns unified financial data: charges, payments, purchases, balance per member
@@ -148,12 +147,13 @@ export async function GET(req: NextRequest) {
         })
       }
 
-      // Payments: period = Gregorian date, description = "תשלום - method"
+      // Payments: period = Hebrew date, description = "תשלום - method"
       for (const pay of payments ?? []) {
         const methodLabel = methodLabels[pay.method] || pay.method
+        const hebrewDate = formatHebrewDate(pay.date, 'he')
         lines.push({
           date: pay.date,
-          period: pay.date, // Gregorian date as-is
+          period: hebrewDate,
           description: `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`,
           charge: 0,
           payment: Number(pay.amount),
@@ -161,8 +161,14 @@ export async function GET(req: NextRequest) {
         })
       }
 
-      // Sort chronologically by date
-      lines.sort((a, b) => a.date.localeCompare(b.date))
+      // Sort by Hebrew calendar order (Tishrei → Elul), not by Gregorian date
+      lines.sort((a, b) => {
+        const idxA = a.lineType === 'payment' ? getPaymentSortIndex(a.date) : getHebrewPeriodSortIndex(a.period)
+        const idxB = b.lineType === 'payment' ? getPaymentSortIndex(b.date) : getHebrewPeriodSortIndex(b.period)
+        if (idxA !== idxB) return idxA - idxB
+        // Same index: sub-sort by Gregorian date
+        return a.date.localeCompare(b.date)
+      })
 
       const totalCharged = lines.reduce((s, l) => s + l.charge, 0)
       const totalPaid = lines.reduce((s, l) => s + l.payment, 0)
