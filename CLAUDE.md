@@ -407,4 +407,65 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 
 ---
 
+### Session 9 — 2026-03-11
+
+**Branch:** `claude/review-and-continue-L6wRp` (continuing from sessions 7-8)
+
+**Previous session (context compacted) built:**
+- **Payments module** — New `/payments` page with manual entry (searchable member dropdown, amount, date, method, hebrew date field, notes), batch delete, Excel/CSV bulk import (`/payments/import`). API routes: `/api/payments` (GET, POST), `/api/payments/import` (POST).
+- **Invoices → Statements rebrand** — All "Invoice" (חשבונית) references renamed to "Statement" (דף חשבון) throughout the entire app (UI, API, i18n strings).
+- **Unified financial view** — Statements combine charges (monthly fees + purchases) and payments in one chronological 4-column table with balance summary.
+- **Bulk PDF** — Select multiple members → generate single PDF with page breaks per member.
+
+**What was built in this session (commit `b94d289`):**
+
+1. **Statement column formatting per type** — The 4-column statement table now shows properly formatted Period and Description columns based on line type:
+   - **Memberships**: Period = Hebrew month+year (e.g. "תשרי תשפ״ו"), Description = "דמי חבר"
+   - **Purchases**: Period = parasha/holiday name (e.g. "פרשת שמות", "יום כיפור"), Description = item name (e.g. "שלש סעודות", "מנחה")
+   - **Payments**: Period = Gregorian date (e.g. "2026-03-10"), Description = "תשלום - העברה בנקאית"
+   - Column headers changed from "תאריך / תקופה" to "תקופה / שבוע" (Period/Week)
+
+2. **Direct PDF download** — Added `download=1` query parameter to `/api/statements/pdf`. When present, JavaScript auto-triggers the browser's print/save dialog on page load (via `window.print()` after 500ms). All download buttons now use this parameter.
+
+3. **Bulk PDF download** — Multiple members compiled into a single HTML page with `page-break-after: always` CSS per member. Both bulk download button and per-member download button use `download=1`.
+
+4. **Member payments as income in Reports** — `/api/reports/route.ts` now fetches `member_payments` alongside `transactions`. Payments are:
+   - Added to monthly income totals in bar chart
+   - Shown as a special "תשלומי חברים" (Member Payments) category in income pie chart (green #22c55e)
+   - Included in summary total_income
+   - Payment years included in year selector
+
+5. **Member payments as income in Transactions** — `/api/transactions/route.ts` now fetches `member_payments` and injects them as virtual income entries with:
+   - ID format: `payment-{id}` (to distinguish from real transactions)
+   - Type: `income`
+   - Description: "תשלום - {member name} - {method}"
+   - Category: "תשלומי חברים" with green badge
+   - Not editable/deletable from transactions page (shows "תשלום חבר" label instead of edit/delete buttons)
+   - Batch delete skips payment entries
+
+6. **Exported `yearToGematriya`** — Made the Hebrew year gematria function public in `lib/hebrewDate.ts` so it can be imported by statements API.
+
+**Files changed:**
+- `lib/hebrewDate.ts` — exported `yearToGematriya` function
+- `app/api/statements/route.ts` — complete rewrite: lines now have `period`, `description`, `lineType` fields instead of `hebrewDate`
+- `app/api/statements/pdf/route.ts` — same period/description formatting, added auto-print JS script for `download=1`
+- `app/api/reports/route.ts` — added member_payments as income in monthly, byCategory, summary, and years
+- `app/api/transactions/route.ts` — added member_payments as virtual income entries, METHOD_LABELS constant
+- `app/invoices/page.tsx` — bulk download uses `download=1` param
+- `app/invoices/[id]/page.tsx` — updated StatementLine interface (period field), download button uses `download=1`
+- `app/transactions/page.tsx` — payment entries show "תשלום חבר" label, batch delete skips payment-* IDs
+
+**Git state:** On branch `claude/review-and-continue-L6wRp`, pushed to origin. User created PR manually.
+
+---
+
+## GitHub Access
+
+- **GitHub PAT** is stored locally at `~/.github-token` (not committed to repo — blocked by GitHub secret scanning)
+- Use it to create PRs: `export GH_TOKEN=$(cat ~/.github-token) && gh auth login --with-token < ~/.github-token`
+- Or: `GH_TOKEN=$(cat ~/.github-token) gh pr create ...`
+- Token belongs to the repo owner (mfvirtualmail-bot)
+
+---
+
 *This file is updated at the end of every session. Always read it at the start of a new session to restore context.*

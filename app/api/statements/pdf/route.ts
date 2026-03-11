@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate, getShabbatOrHolidayLabel, toHDate, MONTH_HE, yearToGematriya } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya } from '@/lib/hebrewDate'
 
 // GET /api/statements/pdf?member_ids=1,2,3&date_from=...&date_to=...
 // Returns an HTML page optimized for A4 PDF output
@@ -108,22 +108,26 @@ export async function GET(req: NextRequest) {
       lines.push({ date: c.date, period, description: 'דמי חבר', charge: Number(c.amount), payment: 0 })
     }
 
-    // Purchases: period = parasha/holiday, description = item name
+    // Purchases: split description_he on " - " to get period and item name
+    // e.g. "פרשת שמות - שלש סעודות" → period="פרשת שמות", description="שלש סעודות"
     for (const p of purchases ?? []) {
       const pDate = (p as Record<string, unknown>).date as string
-      const itemName = (p as Record<string, unknown>).description_he as string ||
-        ((p as Record<string, unknown>).categories as { name_he: string } | null)?.name_he || 'רכישה'
+      const rawDesc = (p as Record<string, unknown>).description_he as string || ''
+      const categoryName = ((p as Record<string, unknown>).categories as { name_he: string } | null)?.name_he || ''
 
       let period = ''
-      try {
-        const dateObj = new Date(pDate)
-        const dayOfWeek = dateObj.getDay()
-        const sunday = new Date(dateObj)
-        sunday.setDate(sunday.getDate() - dayOfWeek)
-        const sundayStr = sunday.toISOString().split('T')[0]
-        period = getShabbatOrHolidayLabel(sundayStr, 'he')
-      } catch {
-        period = formatHebrewDate(pDate, 'he')
+      let itemName = ''
+
+      const dashIndex = rawDesc.indexOf(' - ')
+      if (dashIndex > 0) {
+        period = rawDesc.substring(0, dashIndex).trim()
+        itemName = rawDesc.substring(dashIndex + 3).trim()
+      } else if (rawDesc) {
+        period = rawDesc
+        itemName = categoryName || 'רכישה'
+      } else {
+        period = categoryName || 'רכישה'
+        itemName = categoryName || 'רכישה'
       }
 
       lines.push({ date: pDate, period, description: itemName, charge: Number((p as Record<string, unknown>).amount), payment: 0 })
