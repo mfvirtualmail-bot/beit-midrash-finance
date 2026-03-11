@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
       const allItems = [...chargeItems, ...purchaseItems]
       const total = allItems.reduce((s, i) => s + Number(i.amount), 0)
 
-      const invoiceTitle = `חשבון - ${member.name} - ${periodLabel}`
+      const invoiceTitle = `דף חשבון - ${member.name} - ${periodLabel}`
       const todayStr = new Date().toISOString().split('T')[0]
 
       const { data: invoice, error: invError } = await supabase

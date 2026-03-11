@@ -21,7 +21,7 @@ interface MemberOption {
   name: string
 }
 
-const EMPTY_FORM = { member_id: '', amount: '', date: '', method: 'cash', reference: '', notes: '' }
+const EMPTY_FORM = { member_id: '', amount: '', date: '', hebrewDateText: '', method: 'cash', reference: '', notes: '' }
 
 export default function PaymentsPage() {
   const { T, lang } = useLang()
@@ -92,7 +92,7 @@ export default function PaymentsPage() {
           amount: Number(form.amount),
           date: form.date || undefined,
           method: form.method,
-          reference: form.reference || undefined,
+          reference: form.hebrewDateText || form.reference || undefined,
           notes: form.notes || undefined,
         }),
       })
@@ -306,14 +306,26 @@ export default function PaymentsPage() {
               </div>
 
               {/* Date */}
-              <div>
-                <label className="label">{T.date}</label>
-                <input
-                  type="date"
-                  className="input w-full"
-                  value={form.date}
-                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">{T.date}</label>
+                  <input
+                    type="date"
+                    className="input w-full"
+                    value={form.date}
+                    onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">{he ? 'תאריך עברי / תקופה' : 'Hebrew Date / Period'}</label>
+                  <input
+                    className="input w-full"
+                    value={form.hebrewDateText}
+                    onChange={e => setForm(f => ({ ...f, hebrewDateText: e.target.value }))}
+                    placeholder={he ? "כא אדר א' תשפ\"ו / פרשת שמות" : "Hebrew date or parasha"}
+                    dir="rtl"
+                  />
+                </div>
               </div>
 
               {/* Payment Method */}
