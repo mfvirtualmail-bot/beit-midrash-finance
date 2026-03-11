@@ -226,6 +226,20 @@ export const translations = {
     weekHoliday: 'שבוע / חג',
     period: 'תקופה / שבוע',
     price: 'מחיר',
+    // Payments module
+    paymentsModule: 'תשלומים',
+    recordPayment: 'רשום תשלום',
+    paymentsList: 'רשימת תשלומים',
+    memberName: 'שם חבר',
+    paymentMethod: 'אמצעי תשלום',
+    creditCard: 'כרטיס אשראי',
+    importPayments: 'ייבוא תשלומים מ-Excel',
+    noPayments: 'אין תשלומים',
+    otherPayer: 'משלם אחר',
+    payerName: 'שם המשלם',
+    totalAmount: 'סכום כולל',
+    paymentRecorded: 'התשלום נרשם בהצלחה',
+    backToPayments: 'חזרה לתשלומים',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -452,6 +466,20 @@ export const translations = {
     weekHoliday: 'Week / Holiday',
     period: 'Date / Period',
     price: 'Price',
+    // Payments module
+    paymentsModule: 'Payments',
+    recordPayment: 'Record Payment',
+    paymentsList: 'Payments List',
+    memberName: 'Member Name',
+    paymentMethod: 'Payment Method',
+    creditCard: 'Credit Card',
+    importPayments: 'Import Payments from Excel',
+    noPayments: 'No payments',
+    otherPayer: 'Other Payer',
+    payerName: 'Payer Name',
+    totalAmount: 'Total Amount',
+    paymentRecorded: 'Payment recorded successfully',
+    backToPayments: 'Back to Payments',
   }
 }
 
