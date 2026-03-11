@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate, getShabbatOrHolidayLabel, toHDate, MONTH_HE } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, MONTH_HE } from '@/lib/hebrewDate'
 import { yearToGematriya } from '@/lib/hebrewDate'
 
 // GET /api/statements?member_id=1 or ?member_ids=1,2,3
@@ -112,24 +112,30 @@ export async function GET(req: NextRequest) {
         })
       }
 
-      // Purchases: period = parasha/holiday label, description = item name (category)
+      // Purchases: split description_he on " - " to get period and item name
+      // e.g. "פרשת שמות - שלש סעודות" → period="פרשת שמות", description="שלש סעודות"
+      // e.g. "יום כיפור - מפטיר יונה" → period="יום כיפור", description="מפטיר יונה"
       for (const p of purchases ?? []) {
         const pDate = (p as Record<string, unknown>).date as string
-        const itemName = (p as Record<string, unknown>).description_he as string ||
-          ((p as Record<string, unknown>).categories as { name_he: string } | null)?.name_he || 'רכישה'
+        const rawDesc = (p as Record<string, unknown>).description_he as string || ''
+        const categoryName = ((p as Record<string, unknown>).categories as { name_he: string } | null)?.name_he || ''
 
-        // Get the week's parasha/holiday label for the period column
         let period = ''
-        try {
-          // Find the Sunday of the week containing this date
-          const dateObj = new Date(pDate)
-          const dayOfWeek = dateObj.getDay()
-          const sunday = new Date(dateObj)
-          sunday.setDate(sunday.getDate() - dayOfWeek)
-          const sundayStr = sunday.toISOString().split('T')[0]
-          period = getShabbatOrHolidayLabel(sundayStr, 'he')
-        } catch {
-          period = formatHebrewDate(pDate, 'he')
+        let itemName = ''
+
+        // Split on " - " to separate period from item name
+        const dashIndex = rawDesc.indexOf(' - ')
+        if (dashIndex > 0) {
+          period = rawDesc.substring(0, dashIndex).trim()
+          itemName = rawDesc.substring(dashIndex + 3).trim()
+        } else if (rawDesc) {
+          // No dash separator — use category as item, rawDesc as period
+          period = rawDesc
+          itemName = categoryName || 'רכישה'
+        } else {
+          // No description at all — use category name
+          period = categoryName || 'רכישה'
+          itemName = categoryName || 'רכישה'
         }
 
         lines.push({
