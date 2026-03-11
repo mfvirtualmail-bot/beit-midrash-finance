@@ -46,8 +46,8 @@ export default function PurchasesImportPage() {
         <h3 className="font-semibold text-orange-800 mb-2">{he ? 'הוראות' : 'Instructions'}</h3>
         <p className="text-sm text-orange-700 mb-3">
           {he
-            ? 'העלה קובץ Excel (.xlsx, .xls) או CSV עם עמודות הרכישות. שם/חבר וסכום הם שדות חובה. שם יכול להיות חבר קיים במערכת או שם חופשי (יופיע בחשבונית).'
-            : 'Upload an Excel (.xlsx, .xls) or CSV file. Name/Member and amount are required. Name can be an existing member or a free-text name (will appear on invoices).'}
+            ? 'העלה קובץ Excel (.xlsx, .xls) או CSV עם עמודות הרכישות. שם/חבר וסכום הם שדות חובה. שם יכול להיות חבר קיים במערכת או שם חופשי (יופיע בדף חשבון).'
+            : 'Upload an Excel (.xlsx, .xls) or CSV file. Name/Member and amount are required. Name can be an existing member or a free-text name (will appear on statements).'}
         </p>
         <div className="overflow-x-auto">
           <table className="text-xs w-full">

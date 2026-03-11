@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>חשבונית ${invoice.number || '#' + invoice.id}</title>
+<title>דף חשבון ${invoice.number || '#' + invoice.id}</title>
 <style>
   @page { size: A4; margin: 15mm 20mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
       ${headerText ? `<div style="font-size:12px;color:#4b5563;margin-top:8px;border-top:1px solid #e5e7eb;padding-top:8px;white-space:pre-line">${headerText}</div>` : ''}
     </div>
     <div style="text-align:left">
-      <div class="inv-label">חשבונית</div>
+      <div class="inv-label">דף חשבון</div>
       <div class="inv-number">${invoice.number || '#' + invoice.id}</div>
       <div class="status status-${invoice.status}">${statusMap[invoice.status] ?? invoice.status}</div>
     </div>

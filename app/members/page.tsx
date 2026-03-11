@@ -277,7 +277,7 @@ export default function MembersPage() {
                       <button onClick={() => router.push(`/members/${m.id}`)} className="p-1.5 hover:bg-blue-100 text-blue-600 rounded-lg" title={T.memberDetails}>
                         <Eye size={15} />
                       </button>
-                      <button onClick={() => router.push(`/members/${m.id}#invoice`)} className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg" title={lang === 'he' ? 'הפק חשבונית' : 'Generate Invoice'}>
+                      <button onClick={() => router.push(`/members/${m.id}#invoice`)} className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg" title={lang === 'he' ? 'הפק דף חשבון' : 'Generate Statement'}>
                         <FileText size={15} />
                       </button>
                       <button onClick={() => openEdit(m)} className="p-1.5 hover:bg-gray-100 text-gray-500 rounded-lg">

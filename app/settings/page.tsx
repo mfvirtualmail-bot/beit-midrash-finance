@@ -246,8 +246,8 @@ export default function SettingsPage() {
           </h2>
           <p className="text-xs text-gray-500">
             {lang === 'he'
-              ? 'טקסט זה יופיע בחלק העליון של כל חשבונית (מתחת לשם הארגון). ניתן לכלול כתובת, מספר טלפון, שעות קבלה וכד\'.'
-              : 'This text appears at the top of every invoice (below the org name). You can include address, phone, opening hours, etc.'}
+              ? 'טקסט זה יופיע בחלק העליון של כל דף חשבון (מתחת לשם הארגון). ניתן לכלול כתובת, מספר טלפון, שעות קבלה וכד\'.'
+              : 'This text appears at the top of every statement (below the org name). You can include address, phone, opening hours, etc.'}
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -270,8 +270,8 @@ export default function SettingsPage() {
           </h2>
           <p className="text-xs text-gray-500">
             {lang === 'he'
-              ? 'טקסט זה יופיע בתחתית כל חשבונית. ניתן לכלול פרטי בנק, הודעות תנאים, ברכות וכד\'.'
-              : 'This text appears at the bottom of every invoice. Bank details, terms, blessings, etc.'}
+              ? 'טקסט זה יופיע בתחתית כל דף חשבון. ניתן לכלול פרטי בנק, הודעות תנאים, ברכות וכד\'.'
+              : 'This text appears at the bottom of every statement. Bank details, terms, blessings, etc.'}
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div>

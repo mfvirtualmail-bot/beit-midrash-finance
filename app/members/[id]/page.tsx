@@ -147,7 +147,7 @@ export default function MemberDetailPage() {
           className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 border border-purple-300 text-purple-800 hover:bg-purple-100 rounded-xl font-medium transition-colors"
         >
           <FileText size={15} />
-          {lang === 'he' ? 'הפק חשבונית' : 'Generate Invoice'}
+          {lang === 'he' ? 'הפק דף חשבון' : 'Generate Statement'}
         </button>
       </div>
 
@@ -354,26 +354,26 @@ export default function MemberDetailPage() {
         </div>
       )}
 
-      {/* Generate Invoice Modal */}
+      {/* Generate Statement Modal */}
       {showGenInvoice && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <FileText size={20} className="text-purple-500" />
-              {lang === 'he' ? `הפק חשבונית - ${member.name}` : `Generate Invoice - ${member.name}`}
+              {lang === 'he' ? `הפק דף חשבון - ${member.name}` : `Generate Statement - ${member.name}`}
             </h2>
 
             {genResult ? (
               <div className="space-y-3">
                 <div className="text-green-700 font-semibold text-center">
-                  {lang === 'he' ? 'חשבונית הופקה בהצלחה!' : 'Invoice generated!'}
+                  {lang === 'he' ? 'דף חשבון הופק בהצלחה!' : 'Statement generated!'}
                 </div>
                 <div className="text-center text-gray-600">
                   {lang === 'he' ? 'סכום:' : 'Total:'} €{genResult.total.toLocaleString()}
                 </div>
                 <div className="flex gap-2">
                   <Link href={`/invoices/${genResult.id}`} className="btn-primary flex-1 text-center">
-                    {lang === 'he' ? 'צפה בחשבונית' : 'View Invoice'}
+                    {lang === 'he' ? 'צפה בדף חשבון' : 'View Statement'}
                   </Link>
                   <button onClick={() => setShowGenInvoice(false)} className="btn-secondary flex-1">{T.cancel}</button>
                 </div>
@@ -382,7 +382,7 @@ export default function MemberDetailPage() {
               <>
                 <p className="text-sm text-gray-600">
                   {lang === 'he'
-                    ? 'בחר שנה עברית להפקת חשבונית עבור חבר זה.'
+                    ? 'בחר שנה עברית להפקת דף חשבון עבור חבר זה.'
                     : 'Select a Hebrew year to generate an invoice for this member.'}
                 </p>
                 <div>
@@ -399,7 +399,7 @@ export default function MemberDetailPage() {
                     disabled={genLoading}
                     className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-medium flex-1"
                   >
-                    {genLoading ? T.loading : (lang === 'he' ? 'הפק חשבונית' : 'Generate')}
+                    {genLoading ? T.loading : (lang === 'he' ? 'הפק דף חשבון' : 'Generate')}
                   </button>
                   <button onClick={() => setShowGenInvoice(false)} className="btn-secondary flex-1">{T.cancel}</button>
                 </div>
