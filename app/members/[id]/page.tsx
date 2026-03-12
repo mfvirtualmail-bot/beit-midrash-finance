@@ -1,9 +1,9 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Phone, Mail, MapPin, FileText } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Phone, Mail, MapPin, FileText, Pencil, X } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
-import { getCurrentHebrewYear, getRecentHebrewYears, hebrewYearToGregorianRange } from '@/lib/hebrewDate'
+// hebrewDate utils no longer needed in this page (generate modal removed)
 import Link from 'next/link'
 
 interface MemberDetail {
@@ -33,35 +33,13 @@ export default function MemberDetailPage() {
   const [charge, setCharge] = useState({ description: '', amount: '', date: TODAY, notes: '' })
   const [savingCharge, setSavingCharge] = useState(false)
 
-  // Payment form
+  // Payment form (add/edit)
   const [showPayment, setShowPayment] = useState(false)
-  const [payment, setPayment] = useState({ amount: '', date: TODAY, method: 'cash', reference: '', notes: '' })
+  const [editingPayment, setEditingPayment] = useState<{ id: number; member_id: number } | null>(null)
+  const [payment, setPayment] = useState({ amount: '', date: TODAY, method: '', reference: '', notes: '' })
   const [savingPayment, setSavingPayment] = useState(false)
 
-  // Generate invoice state
-  const [showGenInvoice, setShowGenInvoice] = useState(false)
-  const [genYear, setGenYear] = useState(getCurrentHebrewYear())
-  const [genLoading, setGenLoading] = useState(false)
-  const [genResult, setGenResult] = useState<{ id: number; total: number } | null>(null)
-  const hebrewYears = getRecentHebrewYears()
-
-  async function handleGenerateInvoice() {
-    setGenLoading(true)
-    const range = hebrewYearToGregorianRange(genYear)
-    const res = await fetch('/api/invoices/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: range.start, date_to: range.end, hebrew_year: genYear, member_ids: [Number(id)] }),
-    })
-    const data = await res.json()
-    setGenLoading(false)
-    if (data.invoices && data.invoices.length > 0) {
-      setGenResult({ id: data.invoices[0].id, total: data.invoices[0].total })
-    } else {
-      setGenResult(null)
-      alert(lang === 'he' ? 'לא נמצאו חיובים לתקופה זו' : 'No charges found for this period')
-    }
-  }
+  // (Generate invoice modal removed — now using dynamic statement view)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -74,13 +52,7 @@ export default function MemberDetailPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Auto-open invoice modal if navigated with #invoice
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#invoice' && data) {
-      setGenResult(null)
-      setShowGenInvoice(true)
-    }
-  }, [data])
+  // (Auto-open logic removed — using /invoices?view=id now)
 
   async function addCharge(e: React.FormEvent) {
     e.preventDefault()
@@ -99,16 +71,46 @@ export default function MemberDetailPage() {
     load()
   }
 
-  async function addPayment(e: React.FormEvent) {
+  async function savePayment(e: React.FormEvent) {
     e.preventDefault()
     setSavingPayment(true)
-    const res = await fetch(`/api/members/${id}/payments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payment, amount: Number(payment.amount) }),
-    })
-    if (res.ok) { setShowPayment(false); setPayment({ amount: '', date: TODAY, method: 'cash', reference: '', notes: '' }); load() }
+    const body = {
+      amount: Number(payment.amount),
+      date: payment.date || undefined,
+      method: payment.method || null,
+      reference: payment.reference || null,
+      notes: payment.notes || null,
+    }
+    if (editingPayment) {
+      await fetch(`/api/members/${id}/payments/${editingPayment.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    } else {
+      await fetch(`/api/members/${id}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    }
+    setShowPayment(false)
+    setEditingPayment(null)
+    setPayment({ amount: '', date: TODAY, method: '', reference: '', notes: '' })
+    load()
     setSavingPayment(false)
+  }
+
+  function openEditPayment(p: { id: number; amount: number; date: string; method: string; reference: string | null; notes: string | null }) {
+    setEditingPayment({ id: p.id, member_id: Number(id) })
+    setPayment({
+      amount: String(p.amount),
+      date: p.date,
+      method: p.method || '',
+      reference: p.reference || '',
+      notes: p.notes || '',
+    })
+    setShowPayment(true)
   }
 
   async function deletePayment(paymentId: number) {
@@ -116,10 +118,12 @@ export default function MemberDetailPage() {
     load()
   }
 
-  const methodLabel = (m: string) => {
+  const methodLabel = (m: string | null) => {
+    if (!m) return '—'
     if (m === 'cash') return T.cash
     if (m === 'bank') return T.bankTransfer
     if (m === 'check') return T.check
+    if (m === 'credit_card') return lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'
     return m
   }
 
@@ -142,13 +146,13 @@ export default function MemberDetailPage() {
             {member.address && <span className="flex items-center gap-1"><MapPin size={12} />{member.address}</span>}
           </div>
         </div>
-        <button
-          onClick={() => { setGenResult(null); setShowGenInvoice(true) }}
-          className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 border border-purple-300 text-purple-800 hover:bg-purple-100 rounded-xl font-medium transition-colors"
+        <Link
+          href={`/invoices?view=${id}`}
+          className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium transition-colors"
         >
           <FileText size={15} />
-          {lang === 'he' ? 'הפק דף חשבון' : 'Generate Statement'}
-        </button>
+          {lang === 'he' ? 'צפה בדף חשבון' : 'View Statement'}
+        </Link>
       </div>
 
       {/* Balance summary */}
@@ -246,7 +250,7 @@ export default function MemberDetailPage() {
       <div className="card p-0">
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-700">{T.payments} ({payments.length})</h2>
-          <button onClick={() => setShowPayment(true)} className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5">
+          <button onClick={() => { setEditingPayment(null); setPayment({ amount: '', date: TODAY, method: '', reference: '', notes: '' }); setShowPayment(true) }} className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5">
             <Plus size={14} /> {T.addPayment}
           </button>
         </div>
@@ -271,7 +275,10 @@ export default function MemberDetailPage() {
                   <td className="px-4 py-2 text-gray-400 hidden sm:table-cell">{p.reference || '—'}</td>
                   <td className="px-4 py-2 text-end font-medium text-green-600">{fmt(p.amount)}</td>
                   <td className="px-4 py-2 text-end">
-                    <button onClick={() => deletePayment(p.id)} className="p-1 hover:bg-red-100 text-red-400 rounded"><Trash2 size={13} /></button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => openEditPayment(p)} className="p-1 hover:bg-blue-100 text-blue-500 rounded"><Pencil size={13} /></button>
+                      <button onClick={() => deletePayment(p.id)} className="p-1 hover:bg-red-100 text-red-400 rounded"><Trash2 size={13} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -313,12 +320,15 @@ export default function MemberDetailPage() {
         </div>
       )}
 
-      {/* Add Payment Modal */}
+      {/* Add/Edit Payment Modal */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="p-5 border-b border-gray-100"><h2 className="font-semibold">{T.addPayment}</h2></div>
-            <form onSubmit={addPayment} className="p-5 space-y-3">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold">{editingPayment ? (lang === 'he' ? 'ערוך תשלום' : 'Edit Payment') : T.addPayment}</h2>
+              <button onClick={() => { setShowPayment(false); setEditingPayment(null) }} className="p-1 hover:bg-gray-100 rounded"><X size={18} /></button>
+            </div>
+            <form onSubmit={savePayment} className="p-5 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">{T.amount} (€) *</label>
@@ -332,9 +342,11 @@ export default function MemberDetailPage() {
               <div>
                 <label className="label">{T.method}</label>
                 <select className="input w-full" value={payment.method} onChange={e => setPayment(p => ({ ...p, method: e.target.value }))}>
+                  <option value="">{lang === 'he' ? '— בחר אמצעי —' : '— Select method —'}</option>
                   <option value="cash">{T.cash}</option>
                   <option value="bank">{T.bankTransfer}</option>
                   <option value="check">{T.check}</option>
+                  <option value="credit_card">{lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'}</option>
                 </select>
               </div>
               <div>
@@ -347,67 +359,14 @@ export default function MemberDetailPage() {
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={savingPayment} className="btn-primary flex-1">{savingPayment ? T.loading : T.save}</button>
-                <button type="button" onClick={() => setShowPayment(false)} className="btn-secondary flex-1">{T.cancel}</button>
+                <button type="button" onClick={() => { setShowPayment(false); setEditingPayment(null) }} className="btn-secondary flex-1">{T.cancel}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Generate Statement Modal */}
-      {showGenInvoice && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <FileText size={20} className="text-purple-500" />
-              {lang === 'he' ? `הפק דף חשבון - ${member.name}` : `Generate Statement - ${member.name}`}
-            </h2>
-
-            {genResult ? (
-              <div className="space-y-3">
-                <div className="text-green-700 font-semibold text-center">
-                  {lang === 'he' ? 'דף חשבון הופק בהצלחה!' : 'Statement generated!'}
-                </div>
-                <div className="text-center text-gray-600">
-                  {lang === 'he' ? 'סכום:' : 'Total:'} €{genResult.total.toLocaleString()}
-                </div>
-                <div className="flex gap-2">
-                  <Link href={`/invoices/${genResult.id}`} className="btn-primary flex-1 text-center">
-                    {lang === 'he' ? 'צפה בדף חשבון' : 'View Statement'}
-                  </Link>
-                  <button onClick={() => setShowGenInvoice(false)} className="btn-secondary flex-1">{T.cancel}</button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600">
-                  {lang === 'he'
-                    ? 'בחר שנה עברית להפקת דף חשבון עבור חבר זה.'
-                    : 'Select a Hebrew year to generate an invoice for this member.'}
-                </p>
-                <div>
-                  <label className="label">{lang === 'he' ? 'שנה עברית' : 'Hebrew Year'}</label>
-                  <select className="input w-full" value={genYear} onChange={e => setGenYear(Number(e.target.value))}>
-                    {hebrewYears.map(y => (
-                      <option key={y.year} value={y.year}>{y.label} ({y.year})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={handleGenerateInvoice}
-                    disabled={genLoading}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-medium flex-1"
-                  >
-                    {genLoading ? T.loading : (lang === 'he' ? 'הפק דף חשבון' : 'Generate')}
-                  </button>
-                  <button onClick={() => setShowGenInvoice(false)} className="btn-secondary flex-1">{T.cancel}</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* (Generate Statement modal removed — now uses dynamic "View Statement" link to /invoices?view=id) */}
     </div>
   )
 }

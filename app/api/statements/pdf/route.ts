@@ -24,8 +24,13 @@ export async function GET(req: NextRequest) {
   const orgAddress = settings.org_address || ''
   const orgPhone = settings.org_phone || ''
   const orgEmail = settings.org_email || ''
-  const headerText = settings.invoice_header_he || ''
-  const footerText = settings.invoice_footer_he || ''
+  // Prefer rich-text HTML header/footer; fall back to plain text
+  const headerHtml = settings.statement_header_html || ''
+  const footerHtml = settings.statement_footer_html || ''
+  const headerText = headerHtml || settings.invoice_header_he || ''
+  const footerText = footerHtml || settings.invoice_footer_he || ''
+  const isRichHeader = !!headerHtml
+  const isRichFooter = !!footerHtml
   const logoDataUrl = settings.org_logo || ''
 
   // Get members
@@ -134,12 +139,15 @@ export async function GET(req: NextRequest) {
 
     // Payments: period = Hebrew date, description = "תשלום - method"
     for (const pay of payments ?? []) {
-      const methodLabel = methodLabels[pay.method] || pay.method
+      const methodLabel = pay.method ? (methodLabels[pay.method] || pay.method) : ''
       const hebrewDate = formatHebrewDate(pay.date, 'he')
+      const desc = methodLabel
+        ? `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`
+        : `תשלום${pay.reference ? ` (${pay.reference})` : ''}`
       lines.push({
         date: pay.date,
         period: hebrewDate,
-        description: `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`,
+        description: desc,
         charge: 0,
         payment: Number(pay.amount),
         lineType: 'payment' as const,
@@ -186,7 +194,7 @@ export async function GET(req: NextRequest) {
           </div>
         </div>
 
-        ${headerText ? `<div class="header-note">${headerText}</div>` : ''}
+        ${headerText ? `<div class="${isRichHeader ? 'rich-header' : 'header-note'}">${headerText}</div>` : ''}
 
         <!-- Recipient block -->
         <div class="recipient-block">
@@ -233,9 +241,9 @@ export async function GET(req: NextRequest) {
 
         <!-- Footer block -->
         ${footerText || orgPhone || orgEmail ? `
-        <div class="footer-block">
+        <div class="${isRichFooter ? 'rich-footer' : 'footer-block'}">
           ${footerText ? `<div>${footerText}</div>` : ''}
-          ${!footerText && (orgPhone || orgEmail) ? `<div>${[orgPhone, orgEmail].filter(Boolean).join(' · ')}</div>` : ''}
+          ${!footerText && (orgPhone || orgEmail) ? `<div class="footer-block">${[orgPhone, orgEmail].filter(Boolean).join(' · ')}</div>` : ''}
         </div>` : ''}
       </div>
     `)
@@ -330,8 +338,8 @@ export async function GET(req: NextRequest) {
     letter-spacing: 0.5px;
   }
   table thead th.th-amount { text-align: left; }
-  .row-even { background: #ffffff; }
-  .row-odd { background: #f8fafc; }
+  .row-even { background: #ffffff; page-break-inside: avoid; }
+  .row-odd { background: #f8fafc; page-break-inside: avoid; }
   .row-even:hover, .row-odd:hover { background: #f1f5f9; }
   .cell-period { padding: 8px 14px; font-size: 11px; color: #64748b; font-weight: 500; }
   .cell-desc { padding: 8px 14px; font-size: 12px; font-weight: 600; color: #1e293b; }
@@ -346,6 +354,7 @@ export async function GET(req: NextRequest) {
     border-radius: 8px;
     padding: 0;
     overflow: hidden;
+    page-break-inside: avoid;
   }
   .total-row {
     display: flex;
@@ -369,6 +378,7 @@ export async function GET(req: NextRequest) {
     justify-content: space-between;
     align-items: center;
     color: white;
+    page-break-inside: avoid;
   }
   .balance-block.balance-paid {
     background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
@@ -399,7 +409,22 @@ export async function GET(req: NextRequest) {
     color: #64748b;
     text-align: center;
     white-space: pre-line;
+    page-break-inside: avoid;
   }
+
+  /* Rich text header/footer (from editor) */
+  .rich-header {
+    margin: 0 20px;
+    padding: 12px 18px;
+    page-break-inside: avoid;
+  }
+  .rich-header img { max-width: 100%; height: auto; }
+  .rich-footer {
+    margin: 16px 20px 0;
+    padding: 12px 18px;
+    page-break-inside: avoid;
+  }
+  .rich-footer img { max-width: 100%; height: auto; }
 
   @media print {
     body { padding: 0; background: white; }

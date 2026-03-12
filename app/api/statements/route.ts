@@ -149,12 +149,15 @@ export async function GET(req: NextRequest) {
 
       // Payments: period = Hebrew date, description = "תשלום - method"
       for (const pay of payments ?? []) {
-        const methodLabel = methodLabels[pay.method] || pay.method
+        const methodLabel = pay.method ? (methodLabels[pay.method] || pay.method) : ''
         const hebrewDate = formatHebrewDate(pay.date, 'he')
+        const desc = methodLabel
+          ? `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`
+          : `תשלום${pay.reference ? ` (${pay.reference})` : ''}`
         lines.push({
           date: pay.date,
           period: hebrewDate,
-          description: `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`,
+          description: desc,
           charge: 0,
           payment: Number(pay.amount),
           lineType: 'payment',
