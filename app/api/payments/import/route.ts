@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
       member_id: number
       amount: number
       date: string
-      method: string
+      method: string | null
       reference: string | null
       notes: string | null
       created_by: number | null
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
         member_id: memberId,
         amount,
         date,
-        method,
+        method: method as string | null,
         reference: null,
         notes: r.notes || null,
         created_by: userId,
