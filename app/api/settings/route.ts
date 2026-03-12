@@ -11,6 +11,8 @@ const DEFAULTS: Record<string, string> = {
   invoice_header_en: '',
   invoice_footer_he: '',
   invoice_footer_en: '',
+  statement_header_html: '',
+  statement_footer_html: '',
 }
 
 export async function GET() {

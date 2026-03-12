@@ -21,7 +21,7 @@ interface MemberOption {
   name: string
 }
 
-const EMPTY_FORM = { member_id: '', amount: '', date: '', hebrewDateText: '', method: 'cash', reference: '', notes: '' }
+const EMPTY_FORM = { member_id: '', amount: '', date: '', hebrewDateText: '', method: '', reference: '', notes: '' }
 
 export default function PaymentsPage() {
   const { T, lang } = useLang()
@@ -54,7 +54,8 @@ export default function PaymentsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const methodLabel = (m: string) => {
+  const methodLabel = (m: string | null) => {
+    if (!m) return '—'
     switch (m) {
       case 'cash': return T.cash
       case 'bank': return T.bankTransfer
@@ -408,6 +409,7 @@ export default function PaymentsPage() {
                   value={form.method}
                   onChange={e => setForm(f => ({ ...f, method: e.target.value }))}
                 >
+                  <option value="">{he ? '— בחר אמצעי —' : '— Select method —'}</option>
                   <option value="cash">{T.cash}</option>
                   <option value="check">{T.check}</option>
                   <option value="bank">{T.bankTransfer}</option>

@@ -1,7 +1,10 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 
 interface OrgSettings {
   org_name_he: string
@@ -13,6 +16,8 @@ interface OrgSettings {
   invoice_header_en: string
   invoice_footer_he: string
   invoice_footer_en: string
+  statement_header_html: string
+  statement_footer_html: string
 }
 
 const DEFAULTS: OrgSettings = {
@@ -25,6 +30,8 @@ const DEFAULTS: OrgSettings = {
   invoice_header_en: '',
   invoice_footer_he: '',
   invoice_footer_en: '',
+  statement_header_html: '',
+  statement_footer_html: '',
 }
 
 export default function SettingsPage() {
@@ -38,6 +45,7 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [migrating, setMigrating] = useState(false)
   const [migrateMsg, setMigrateMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [showPreview, setShowPreview] = useState<'header' | 'footer' | null>(null)
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(data => {
@@ -239,53 +247,105 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Invoice Header */}
+        {/* Statement Header - Rich Text Editor */}
         <div className="card space-y-4">
-          <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3">
-            📄 {T.invoiceHeader}
-          </h2>
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h2 className="text-base font-semibold text-gray-700 flex items-center gap-2">
+              <FileText size={16} className="text-blue-500" />
+              {lang === 'he' ? 'כותרת דף חשבון (עליון)' : 'Statement Header'}
+            </h2>
+            {form.statement_header_html && (
+              <button
+                type="button"
+                onClick={() => setShowPreview(showPreview === 'header' ? null : 'header')}
+                className="flex items-center gap-1 text-xs px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg"
+              >
+                <Eye size={12} /> {lang === 'he' ? 'תצוגה מקדימה' : 'Preview'}
+              </button>
+            )}
+          </div>
           <p className="text-xs text-gray-500">
             {lang === 'he'
-              ? 'טקסט זה יופיע בחלק העליון של כל דף חשבון (מתחת לשם הארגון). ניתן לכלול כתובת, מספר טלפון, שעות קבלה וכד\'.'
-              : 'This text appears at the top of every statement (below the org name). You can include address, phone, opening hours, etc.'}
+              ? 'עצב כותרת עליונה מותאמת אישית עם טקסט מעוצב, תמונות ולוגו. תוכן זה יופיע מעל טבלת דף החשבון.'
+              : 'Design a custom header with rich text, images, and logos. This content appears above the statement table.'}
           </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">{lang === 'he' ? 'כותרת (עברית)' : 'Header (Hebrew)'}</label>
-              <textarea dir="rtl" rows={4} className="input w-full resize-none text-sm" {...f('invoice_header_he')}
-                placeholder={lang === 'he' ? 'רחוב הדוגמה 1, ירושלים\nטלפון: 02-1234567' : 'Free text header in Hebrew'} />
+          <RichTextEditor
+            value={form.statement_header_html}
+            onChange={(html: string) => setForm(prev => ({ ...prev, statement_header_html: html }))}
+            placeholder={lang === 'he' ? 'הקלד כותרת עליונה...' : 'Type header content...'}
+          />
+          {showPreview === 'header' && form.statement_header_html && (
+            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/50">
+              <div className="text-xs font-medium text-blue-500 mb-2">{lang === 'he' ? 'תצוגה מקדימה:' : 'Preview:'}</div>
+              <div className="bg-white border rounded-lg p-4" dir="rtl" dangerouslySetInnerHTML={{ __html: form.statement_header_html }} />
             </div>
-            <div>
-              <label className="label">{lang === 'he' ? 'כותרת (אנגלית)' : 'Header (English)'}</label>
-              <textarea dir="ltr" rows={4} className="input w-full resize-none text-sm" {...f('invoice_header_en')}
-                placeholder="1 Example St, Jerusalem&#10;Tel: 02-1234567" />
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Invoice Footer */}
+        {/* Statement Footer - Rich Text Editor */}
         <div className="card space-y-4">
-          <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3">
-            📋 {T.invoiceFooter}
-          </h2>
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h2 className="text-base font-semibold text-gray-700 flex items-center gap-2">
+              <FileText size={16} className="text-green-500" />
+              {lang === 'he' ? 'תחתית דף חשבון (תחתון)' : 'Statement Footer'}
+            </h2>
+            {form.statement_footer_html && (
+              <button
+                type="button"
+                onClick={() => setShowPreview(showPreview === 'footer' ? null : 'footer')}
+                className="flex items-center gap-1 text-xs px-2 py-1 text-green-600 hover:bg-green-50 rounded-lg"
+              >
+                <Eye size={12} /> {lang === 'he' ? 'תצוגה מקדימה' : 'Preview'}
+              </button>
+            )}
+          </div>
           <p className="text-xs text-gray-500">
             {lang === 'he'
-              ? 'טקסט זה יופיע בתחתית כל דף חשבון. ניתן לכלול פרטי בנק, הודעות תנאים, ברכות וכד\'.'
-              : 'This text appears at the bottom of every statement. Bank details, terms, blessings, etc.'}
+              ? 'עצב תחתית מותאמת אישית עם פרטי בנק, תנאים, ברכות וכד\'. תוכן זה יופיע מתחת לטבלת דף החשבון.'
+              : 'Design a custom footer with bank details, terms, blessings, etc. This content appears below the statement table.'}
           </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">{lang === 'he' ? 'תחתית (עברית)' : 'Footer (Hebrew)'}</label>
-              <textarea dir="rtl" rows={4} className="input w-full resize-none text-sm" {...f('invoice_footer_he')}
-                placeholder={lang === 'he' ? 'לתשלומים: בנק הפועלים\nסניף: 123, חשבון: 456789' : 'Free text footer in Hebrew'} />
+          <RichTextEditor
+            value={form.statement_footer_html}
+            onChange={(html: string) => setForm(prev => ({ ...prev, statement_footer_html: html }))}
+            placeholder={lang === 'he' ? 'הקלד תחתית...' : 'Type footer content...'}
+          />
+          {showPreview === 'footer' && form.statement_footer_html && (
+            <div className="border border-green-200 rounded-lg p-4 bg-green-50/50">
+              <div className="text-xs font-medium text-green-500 mb-2">{lang === 'he' ? 'תצוגה מקדימה:' : 'Preview:'}</div>
+              <div className="bg-white border rounded-lg p-4" dir="rtl" dangerouslySetInnerHTML={{ __html: form.statement_footer_html }} />
             </div>
-            <div>
-              <label className="label">{lang === 'he' ? 'תחתית (אנגלית)' : 'Footer (English)'}</label>
-              <textarea dir="ltr" rows={4} className="input w-full resize-none text-sm" {...f('invoice_footer_en')}
-                placeholder="Bank: Hapoalim&#10;Branch: 123, Account: 456789" />
+          )}
+        </div>
+
+        {/* Legacy plain text header/footer (kept for backward compatibility) */}
+        <details className="card">
+          <summary className="text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700">
+            {lang === 'he' ? 'כותרת/תחתית טקסט פשוט (גיבוי)' : 'Plain Text Header/Footer (Legacy)'}
+          </summary>
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">{lang === 'he' ? 'כותרת (עברית)' : 'Header (Hebrew)'}</label>
+                <textarea dir="rtl" rows={3} className="input w-full resize-none text-sm" {...f('invoice_header_he')}
+                  placeholder={lang === 'he' ? 'רחוב הדוגמה 1, ירושלים' : 'Free text header'} />
+              </div>
+              <div>
+                <label className="label">{lang === 'he' ? 'כותרת (אנגלית)' : 'Header (English)'}</label>
+                <textarea dir="ltr" rows={3} className="input w-full resize-none text-sm" {...f('invoice_header_en')} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">{lang === 'he' ? 'תחתית (עברית)' : 'Footer (Hebrew)'}</label>
+                <textarea dir="rtl" rows={3} className="input w-full resize-none text-sm" {...f('invoice_footer_he')} />
+              </div>
+              <div>
+                <label className="label">{lang === 'he' ? 'תחתית (אנגלית)' : 'Footer (English)'}</label>
+                <textarea dir="ltr" rows={3} className="input w-full resize-none text-sm" {...f('invoice_footer_en')} />
+              </div>
             </div>
           </div>
-        </div>
+        </details>
 
         <button type="submit" disabled={saving} className="btn-primary w-full text-base py-3">
           {saving ? T.loading : T.save}
