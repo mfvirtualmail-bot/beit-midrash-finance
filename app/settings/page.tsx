@@ -2,6 +2,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 
 interface OrgSettings {
   org_name_he: string
@@ -246,19 +249,27 @@ export default function SettingsPage() {
           </h2>
           <p className="text-xs text-gray-500">
             {lang === 'he'
-              ? 'טקסט זה יופיע בחלק העליון של כל דף חשבון (מתחת לשם הארגון). ניתן לכלול כתובת, מספר טלפון, שעות קבלה וכד\'.'
-              : 'This text appears at the top of every statement (below the org name). You can include address, phone, opening hours, etc.'}
+              ? 'עצב את הכותרת העליונה של דפי חשבון. ניתן לעצב טקסט, לשנות גודל, צבע, יישור ולהוסיף תמונות.'
+              : 'Design your statement header. Format text, change size, color, alignment, and add images.'}
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <label className="label">{lang === 'he' ? 'כותרת (עברית)' : 'Header (Hebrew)'}</label>
-              <textarea dir="rtl" rows={4} className="input w-full resize-none text-sm" {...f('invoice_header_he')}
-                placeholder={lang === 'he' ? 'רחוב הדוגמה 1, ירושלים\nטלפון: 02-1234567' : 'Free text header in Hebrew'} />
+              <RichTextEditor
+                value={form.invoice_header_he}
+                onChange={(val: string) => setForm(prev => ({ ...prev, invoice_header_he: val }))}
+                placeholder={lang === 'he' ? 'כתוב כאן את כותרת דף החשבון...' : 'Statement header text...'}
+                dir="rtl"
+              />
             </div>
             <div>
               <label className="label">{lang === 'he' ? 'כותרת (אנגלית)' : 'Header (English)'}</label>
-              <textarea dir="ltr" rows={4} className="input w-full resize-none text-sm" {...f('invoice_header_en')}
-                placeholder="1 Example St, Jerusalem&#10;Tel: 02-1234567" />
+              <RichTextEditor
+                value={form.invoice_header_en}
+                onChange={(val: string) => setForm(prev => ({ ...prev, invoice_header_en: val }))}
+                placeholder="Statement header text..."
+                dir="ltr"
+              />
             </div>
           </div>
         </div>
@@ -270,19 +281,27 @@ export default function SettingsPage() {
           </h2>
           <p className="text-xs text-gray-500">
             {lang === 'he'
-              ? 'טקסט זה יופיע בתחתית כל דף חשבון. ניתן לכלול פרטי בנק, הודעות תנאים, ברכות וכד\'.'
-              : 'This text appears at the bottom of every statement. Bank details, terms, blessings, etc.'}
+              ? 'עצב את התחתית של דפי חשבון. ניתן לכלול פרטי בנק, הודעות, ברכות וכד\'.'
+              : 'Design your statement footer. Include bank details, terms, blessings, etc.'}
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <label className="label">{lang === 'he' ? 'תחתית (עברית)' : 'Footer (Hebrew)'}</label>
-              <textarea dir="rtl" rows={4} className="input w-full resize-none text-sm" {...f('invoice_footer_he')}
-                placeholder={lang === 'he' ? 'לתשלומים: בנק הפועלים\nסניף: 123, חשבון: 456789' : 'Free text footer in Hebrew'} />
+              <RichTextEditor
+                value={form.invoice_footer_he}
+                onChange={(val: string) => setForm(prev => ({ ...prev, invoice_footer_he: val }))}
+                placeholder={lang === 'he' ? 'כתוב כאן את תחתית דף החשבון...' : 'Statement footer text...'}
+                dir="rtl"
+              />
             </div>
             <div>
               <label className="label">{lang === 'he' ? 'תחתית (אנגלית)' : 'Footer (English)'}</label>
-              <textarea dir="ltr" rows={4} className="input w-full resize-none text-sm" {...f('invoice_footer_en')}
-                placeholder="Bank: Hapoalim&#10;Branch: 123, Account: 456789" />
+              <RichTextEditor
+                value={form.invoice_footer_en}
+                onChange={(val: string) => setForm(prev => ({ ...prev, invoice_footer_en: val }))}
+                placeholder="Statement footer text..."
+                dir="ltr"
+              />
             </div>
           </div>
         </div>

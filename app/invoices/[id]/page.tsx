@@ -202,7 +202,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {headerText && (
-          <div className="bg-blue-50 border-e-4 border-blue-600 px-4 py-2 text-[10px] text-blue-800 whitespace-pre-line">{headerText}</div>
+          <div className="bg-blue-50 border-e-4 border-blue-600 px-4 py-2.5 text-[11px] text-blue-800 [&_p]:my-0.5 [&_img]:max-w-full [&_img]:h-auto" dangerouslySetInnerHTML={{ __html: headerText }} />
         )}
 
         {/* Recipient block */}
@@ -321,7 +321,7 @@ export default function InvoiceDetailPage() {
         {/* Footer block */}
         {(footerText || settings?.org_phone || settings?.org_email) ? (
           <div className="mx-5 mt-4 mb-5 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center">
-            {footerText && <div className="text-[10px] text-slate-500 whitespace-pre-line">{footerText}</div>}
+            {footerText && <div className="text-[10px] text-slate-500 [&_p]:my-0.5 [&_img]:max-w-full [&_img]:h-auto" dangerouslySetInnerHTML={{ __html: footerText }} />}
             {!footerText && (settings?.org_phone || settings?.org_email) && (
               <div className="text-[10px] text-slate-400">
                 {[settings?.org_phone, settings?.org_email].filter(Boolean).join(' · ')}

@@ -21,7 +21,7 @@ interface MemberOption {
   name: string
 }
 
-const EMPTY_FORM = { member_id: '', amount: '', date: '', hebrewDateText: '', method: 'cash', reference: '', notes: '' }
+const EMPTY_FORM = { member_id: '', amount: '', date: '', hebrewDateText: '', method: '', reference: '', notes: '' }
 
 export default function PaymentsPage() {
   const { T, lang } = useLang()
@@ -79,7 +79,7 @@ export default function PaymentsPage() {
       amount: String(payment.amount),
       date: payment.date,
       hebrewDateText: payment.reference || '',
-      method: payment.method,
+      method: payment.method || '',
       reference: '',
       notes: payment.notes || '',
     })
@@ -282,9 +282,13 @@ export default function PaymentsPage() {
                   </td>
                   <td className="px-4 py-3 text-end font-semibold text-green-600">{fmt(p.amount)}</td>
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
-                      {methodLabel(p.method)}
-                    </span>
+                    {p.method ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
+                        {methodLabel(p.method)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs hidden md:table-cell max-w-[200px] truncate">
                     {p.reference && <span className="text-blue-500 me-1">[{p.reference}]</span>}
@@ -408,6 +412,7 @@ export default function PaymentsPage() {
                   value={form.method}
                   onChange={e => setForm(f => ({ ...f, method: e.target.value }))}
                 >
+                  <option value="">{he ? '— בחר —' : '— Select —'}</option>
                   <option value="cash">{T.cash}</option>
                   <option value="check">{T.check}</option>
                   <option value="bank">{T.bankTransfer}</option>

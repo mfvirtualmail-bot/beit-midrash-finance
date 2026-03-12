@@ -134,12 +134,12 @@ export async function GET(req: NextRequest) {
 
     // Payments: period = Hebrew date, description = "תשלום - method"
     for (const pay of payments ?? []) {
-      const methodLabel = methodLabels[pay.method] || pay.method
+      const methodLabel = pay.method ? (methodLabels[pay.method] || pay.method) : ''
       const hebrewDate = formatHebrewDate(pay.date, 'he')
       lines.push({
         date: pay.date,
         period: hebrewDate,
-        description: `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`,
+        description: methodLabel ? `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}` : `תשלום${pay.reference ? ` (${pay.reference})` : ''}`,
         charge: 0,
         payment: Number(pay.amount),
         lineType: 'payment' as const,
@@ -186,7 +186,7 @@ export async function GET(req: NextRequest) {
           </div>
         </div>
 
-        ${headerText ? `<div class="header-note">${headerText}</div>` : ''}
+        ${headerText ? `<div class="header-note rich-html">${headerText}</div>` : ''}
 
         <!-- Recipient block -->
         <div class="recipient-block">
@@ -233,7 +233,7 @@ export async function GET(req: NextRequest) {
 
         <!-- Footer block -->
         ${footerText || orgPhone || orgEmail ? `
-        <div class="footer-block">
+        <div class="footer-block rich-html">
           ${footerText ? `<div>${footerText}</div>` : ''}
           ${!footerText && (orgPhone || orgEmail) ? `<div>${[orgPhone, orgEmail].filter(Boolean).join(' · ')}</div>` : ''}
         </div>` : ''}
@@ -292,11 +292,17 @@ export async function GET(req: NextRequest) {
   .header-note {
     background: #eff6ff;
     border-right: 4px solid #2563eb;
-    padding: 8px 16px;
-    font-size: 10px;
+    padding: 10px 16px;
+    font-size: 11px;
     color: #1e40af;
-    white-space: pre-line;
   }
+  .rich-html p { margin: 0 0 4px; }
+  .rich-html p:last-child { margin-bottom: 0; }
+  .rich-html img { max-width: 100%; height: auto; border-radius: 4px; }
+  .rich-html h1 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+  .rich-html h2 { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+  .rich-html h3 { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
+  .rich-html a { color: #2563eb; text-decoration: underline; }
 
   /* Recipient block */
   .recipient-block {
@@ -337,6 +343,7 @@ export async function GET(req: NextRequest) {
   .cell-desc { padding: 8px 14px; font-size: 12px; font-weight: 600; color: #1e293b; }
   .cell-charge { padding: 8px 14px; font-size: 12px; text-align: left; color: #dc2626; font-weight: 600; }
   .cell-payment { padding: 8px 14px; font-size: 12px; text-align: left; color: #16a34a; font-weight: 600; }
+  table tbody tr { page-break-inside: avoid; break-inside: avoid; }
 
   /* Totals block */
   .totals-block {

@@ -6,19 +6,32 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search') || ''
+    const dateFrom = searchParams.get('date_from') || ''
+    const dateTo = searchParams.get('date_to') || ''
 
     let q = supabase.from('members').select('*').order('name')
     if (search) q = q.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
     const { data: members } = await q
 
-    const { data: charges } = await supabase.from('member_charges').select('member_id, amount, description')
-    const { data: payments } = await supabase.from('member_payments').select('member_id, amount')
+    let chargesQ = supabase.from('member_charges').select('member_id, amount, description')
+    if (dateFrom) chargesQ = chargesQ.gte('date', dateFrom)
+    if (dateTo) chargesQ = chargesQ.lte('date', dateTo)
+    const { data: charges } = await chargesQ
+
+    let paymentsQ = supabase.from('member_payments').select('member_id, amount')
+    if (dateFrom) paymentsQ = paymentsQ.gte('date', dateFrom)
+    if (dateTo) paymentsQ = paymentsQ.lte('date', dateTo)
+    const { data: payments } = await paymentsQ
+
     // Also get purchase transactions linked to members
-    const { data: purchases } = await supabase
+    let purchasesQ = supabase
       .from('transactions')
       .select('member_id, amount')
       .not('member_id', 'is', null)
       .in('type', ['expense', 'purchase'])
+    if (dateFrom) purchasesQ = purchasesQ.gte('date', dateFrom)
+    if (dateTo) purchasesQ = purchasesQ.lte('date', dateTo)
+    const { data: purchases } = await purchasesQ
 
     const result = (members ?? []).map(m => {
       const memberCharges = (charges ?? []).filter(c => c.member_id === m.id)

@@ -1,10 +1,10 @@
 'use client'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { Member } from '@/lib/db'
 import { getCurrentHebrewYear, getRecentHebrewYears, hebrewYearToGregorianRange } from '@/lib/hebrewDate'
 import { generatePdfFromElement, generateMultiMemberPdf, downloadBlob, createPdfPreviewUrl } from '@/lib/pdfGenerator'
-import { FileText, Eye, Download, Search, Zap, CheckCircle, X, Loader2 } from 'lucide-react'
+import { FileText, Eye, Download, Search, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function StatementsPage() {
@@ -19,31 +19,25 @@ export default function StatementsPage() {
   const hebrewYears = getRecentHebrewYears()
   const [selectedYear, setSelectedYear] = useState(getCurrentHebrewYear())
 
-  // Generate modal
-  const [showGenModal, setShowGenModal] = useState(false)
-  const [genMemberId, setGenMemberId] = useState<number | ''>('')
-  const [genLoading, setGenLoading] = useState(false)
-  const [genResult, setGenResult] = useState<{ count: number; invoices: { id: number; member: string; total: number; email: string | null }[] } | null>(null)
-
   // PDF preview modal
   const [showPreview, setShowPreview] = useState(false)
   const [previewUrl, setPreviewUrl] = useState('')
   const [pdfGenerating, setPdfGenerating] = useState(false)
   const [previewMemberIds, setPreviewMemberIds] = useState<number[]>([])
   const [previewMemberName, setPreviewMemberName] = useState('')
-  const renderContainerRef = useRef<HTMLDivElement>(null)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/members')
+    const range = hebrewYearToGregorianRange(selectedYear)
+    const res = await fetch(`/api/members?date_from=${range.start}&date_to=${range.end}`)
     const data = await res.json()
     setMembers(Array.isArray(data) ? data : [])
     setLoading(false)
-  }
+  }, [selectedYear])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   // Cleanup preview URL on unmount
   useEffect(() => {
@@ -61,21 +55,6 @@ export default function StatementsPage() {
   const filteredMembers = members.filter(m =>
     !search || m.name.toLowerCase().includes(search.toLowerCase())
   )
-
-  async function handleGenerate() {
-    setGenLoading(true)
-    const range = hebrewYearToGregorianRange(selectedYear)
-    const body: Record<string, unknown> = { date_from: range.start, date_to: range.end, hebrew_year: selectedYear }
-    if (genMemberId) body.member_ids = [genMemberId]
-    const res = await fetch('/api/invoices/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const data = await res.json()
-    setGenResult(data)
-    setGenLoading(false)
-  }
 
   // Generate PDF from HTML rendered in hidden container
   const generatePdf = useCallback(async (memberIds: number[], forDownload: boolean, memberName?: string) => {
@@ -164,29 +143,16 @@ export default function StatementsPage() {
 
   function downloadFromPreview() {
     if (!previewUrl || !previewMemberIds.length) return
-    // Re-generate for download
     generatePdf(previewMemberIds, true, previewMemberName)
   }
 
   return (
     <div className="space-y-6">
-      {/* Hidden container for PDF rendering */}
-      <div ref={renderContainerRef} style={{ position: 'fixed', left: '-9999px', top: 0 }} />
-
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <FileText size={24} className="text-blue-600" /> {he ? 'דפי חשבון' : 'Statements'}
         </h1>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => { setGenResult(null); setGenMemberId(''); setShowGenModal(true) }}
-            className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 border border-purple-300 text-purple-800 hover:bg-purple-100 rounded-xl font-medium transition-colors"
-          >
-            <Zap size={15} />
-            {he ? 'הפק דפי חשבון' : 'Generate Statements'}
-          </button>
-        </div>
       </div>
 
       {/* PDF generating indicator */}
@@ -288,7 +254,7 @@ export default function StatementsPage() {
                         onClick={() => viewStatement(m.id, m.name)}
                         disabled={pdfGenerating}
                         className="p-1.5 hover:bg-blue-100 text-blue-600 rounded-lg disabled:opacity-50"
-                        title={he ? 'תצוגה מקדימה' : 'Preview'}
+                        title={he ? 'הצג דף חשבון' : 'View Statement'}
                       >
                         <Eye size={15} />
                       </button>
@@ -343,82 +309,6 @@ export default function StatementsPage() {
                 title="PDF Preview"
               />
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Generate Statements Modal */}
-      {showGenModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Zap size={20} className="text-purple-500" />
-              {he ? 'הפקת דפי חשבון' : 'Generate Statements'}
-            </h2>
-
-            {genResult ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-green-700 font-semibold">
-                  <CheckCircle size={20} />
-                  {genResult.count} {he ? 'דפי חשבון הופקו' : 'statements generated'}
-                </div>
-                {genResult.invoices.length > 0 && (
-                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                    {genResult.invoices.map(inv => (
-                      <div key={inv.id} className="px-4 py-2 flex items-center justify-between text-sm">
-                        <div>
-                          <span className="font-medium">{inv.member}</span>
-                          <span className="text-gray-500 ms-2">{fmt(inv.total)}</span>
-                        </div>
-                        <Link href={`/invoices/${inv.id}`} target="_blank" className="p-1 text-blue-600 hover:bg-blue-50 rounded">
-                          <Eye size={13} />
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {genResult.count === 0 && (
-                  <p className="text-gray-500 text-sm">{he ? 'לא נמצאו חיובים לתקופה זו.' : 'No charges found for this period.'}</p>
-                )}
-                <button onClick={() => setShowGenModal(false)} className="btn-secondary w-full">{T.cancel}</button>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm text-gray-600">
-                  {he
-                    ? 'בחר שנה עברית וחבר (אופציונלי). המערכת תיצור דף חשבון לכל חבר שיש לו חיובים ורכישות.'
-                    : 'Select a Hebrew year and optionally a specific member.'}
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="label">{he ? 'שנה עברית' : 'Hebrew Year'}</label>
-                    <select className="input w-full" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>
-                      {hebrewYears.map(y => (
-                        <option key={y.year} value={y.year}>{y.label} ({y.year})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">{he ? 'חבר (אופציונלי)' : 'Member (optional)'}</label>
-                    <select className="input w-full" value={genMemberId} onChange={e => setGenMemberId(e.target.value ? Number(e.target.value) : '')}>
-                      <option value="">{he ? '— כל החברים —' : '— All Members —'}</option>
-                      {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-3 justify-end pt-2">
-                  <button className="btn-secondary" onClick={() => setShowGenModal(false)}>{T.cancel}</button>
-                  <button
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2"
-                    onClick={handleGenerate}
-                    disabled={genLoading}
-                  >
-                    <Zap size={16} />
-                    {genLoading ? T.loading : (he ? 'הפק' : 'Generate')}
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </div>
       )}
