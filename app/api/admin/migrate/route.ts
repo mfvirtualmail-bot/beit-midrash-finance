@@ -25,6 +25,10 @@ ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS period text;
 -- v5: Allow 'purchase' type in transactions table
 ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
 ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN ('income', 'expense', 'purchase'));
+
+-- v6: Make payment method nullable (stop defaulting to 'cash')
+ALTER TABLE member_payments ALTER COLUMN method DROP NOT NULL;
+ALTER TABLE member_payments ALTER COLUMN method DROP DEFAULT;
 `
 
 export async function POST() {

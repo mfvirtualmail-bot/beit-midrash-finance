@@ -19,13 +19,14 @@ function normalizeHeader(h: string): string {
   return s
 }
 
-function normalizeMethod(m: string): string {
+function normalizeMethod(m: string): string | null {
   const s = m.trim().toLowerCase()
+  if (!s) return null
   if (['cash', 'מזומן', 'כסף מזומן'].includes(s)) return 'cash'
   if (['check', "צ'ק", 'שיק', 'cheque'].includes(s)) return 'check'
   if (['bank', 'bank_transfer', 'העברה', 'העברה בנקאית', 'transfer'].includes(s)) return 'bank'
   if (['credit', 'credit_card', 'כרטיס אשראי', 'אשראי', 'card'].includes(s)) return 'credit_card'
-  return 'cash'
+  return null
 }
 
 // Parse dates in any common format → YYYY-MM-DD
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      const method = r.method ? normalizeMethod(r.method) : 'cash'
+      const method = r.method ? normalizeMethod(r.method) : null
 
       // Parse date - handle all common formats
       let date = defaultDate
