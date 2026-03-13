@@ -54,14 +54,16 @@ export async function GET(req: NextRequest) {
       const { data: payments } = await pq
       for (const p of payments ?? []) {
         const memberName = ((p.members as unknown) as { name: string } | null)?.name || ''
-        const methodLabel = METHOD_LABELS[p.method] || p.method
+        const methodLabel = p.method ? (METHOD_LABELS[p.method] || p.method) : ''
+        const descHe = methodLabel ? `תשלום - ${memberName} - ${methodLabel}` : `תשלום - ${memberName}`
+        const descEn = methodLabel ? `Payment - ${memberName} - ${methodLabel}` : `Payment - ${memberName}`
         transactions.push({
           id: `payment-${p.id}`,
           type: 'income',
           amount: Number(p.amount),
           date: p.date,
-          description_he: `תשלום - ${memberName} - ${methodLabel}`,
-          description_en: `Payment - ${memberName} - ${methodLabel}`,
+          description_he: descHe,
+          description_en: descEn,
           category_id: null,
           category_name_he: 'תשלומי חברים',
           category_name_en: 'Member Payments',

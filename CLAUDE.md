@@ -459,6 +459,59 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 
 ---
 
+### Session 10 — 2026-03-12
+
+**Branch:** `claude/member-statements-pdf-engine-GtTxl`
+
+**What was built (sessions 10a-10c, multiple commits):**
+
+1. **Dynamic member statements** — Replaced "Generate Statement" with "View Statement" modal on `/invoices` page. Year dropdown refreshes data immediately. Uses `useSearchParams()` wrapped in Suspense.
+
+2. **Payment CRUD** — Full edit modal on member detail page and payments page. Payment method is a dropdown (cash/check/bank/credit_card) that defaults to blank.
+
+3. **Rich text header/footer editor** — React-Quill integration in Settings page. Custom HTML header/footer saved to `settings` table keys `statement_header_html` / `statement_footer_html`. Injected into PDF output.
+
+4. **PDF pagination** — `page-break-inside: avoid` on table rows, totals, balance, and footer blocks.
+
+5. **Fix: payment method no longer defaults to 'cash'** — Comprehensive fix across ALL code paths:
+   - `/api/payments/route.ts` POST: `method: method || null`
+   - `/api/members/[id]/payments/route.ts` POST: `method: method || null`
+   - `/api/members/[id]/payments/[paymentId]/route.ts` PUT: `method: method || null`
+   - `/api/payments/import/route.ts`: `normalizeMethod()` returns `null` for unknown, caller defaults to `null`
+   - `/api/transactions/route.ts`: handles null method gracefully in payment descriptions
+   - `/api/statements/route.ts` and `/api/statements/pdf/route.ts`: null method → blank description (just "תשלום" not "תשלום - מזומן")
+   - `app/payments/page.tsx`: form sends `method: form.method || null`, dropdown defaults to empty
+   - `app/members/[id]/page.tsx`: payment form sends `method || null`
+   - v6 migration: `ALTER TABLE member_payments ALTER COLUMN method DROP NOT NULL; DROP DEFAULT;`
+   - v7 migration: `UPDATE member_payments SET method = NULL WHERE method = 'cash';` — cleans up ALL existing rows
+
+**CRITICAL: After deploy, run `POST /api/admin/migrate`** to:
+- Make `member_payments.method` column nullable (v6)
+- Set all existing 'cash' values to NULL (v7)
+
+**Files changed:**
+- `app/api/admin/migrate/route.ts` — added v6+v7 migrations
+- `app/api/members/[id]/payments/route.ts` — method null fix
+- `app/api/members/[id]/payments/[paymentId]/route.ts` — method null fix on PUT
+- `app/api/payments/route.ts` — method null fix
+- `app/api/payments/import/route.ts` — normalizeMethod returns null, type fix
+- `app/api/transactions/route.ts` — null method in payment descriptions
+- `app/api/statements/route.ts` — null method handling
+- `app/api/statements/pdf/route.ts` — null method handling, rich header/footer, pagination CSS
+- `app/api/settings/route.ts` — added statement_header_html/footer_html defaults
+- `app/payments/page.tsx` — method sends null, dropdown defaults blank
+- `app/members/[id]/page.tsx` — payment edit modal, method null
+- `app/invoices/page.tsx` — dynamic statement modal with year dropdown
+- `app/settings/page.tsx` — React-Quill rich text editors
+- `components/RichTextEditor.tsx` — new component
+- `package.json` — added react-quill
+
+**Known issue:** `member_payments.method` DB column is `NOT NULL DEFAULT 'cash'` until v6+v7 migration runs. All code now sends `null` for empty method, but the DB will reject it until migration runs.
+
+**Git state:** On branch `claude/member-statements-pdf-engine-GtTxl`, pushed to origin.
+
+---
+
 ## GitHub Access
 
 - **GitHub PAT** is stored locally at `~/.github-token` (not committed to repo — blocked by GitHub secret scanning)

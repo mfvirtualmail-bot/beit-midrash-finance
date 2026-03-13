@@ -29,6 +29,10 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 -- v6: Make payment method nullable (stop defaulting to 'cash')
 ALTER TABLE member_payments ALTER COLUMN method DROP NOT NULL;
 ALTER TABLE member_payments ALTER COLUMN method DROP DEFAULT;
+
+-- v7: Clean up existing 'cash' defaults — set to NULL where method was auto-filled
+-- This converts all existing 'cash' entries to NULL so statements show blank
+UPDATE member_payments SET method = NULL WHERE method = 'cash';
 `
 
 export async function POST() {
