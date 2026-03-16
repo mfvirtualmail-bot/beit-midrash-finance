@@ -101,7 +101,7 @@ export default function PaymentsPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.member_id || !form.amount) return
+    if (!form.member_id || !form.amount || !form.method) return
     setSaving(true)
     try {
       if (editing) {
@@ -403,11 +403,12 @@ export default function PaymentsPage() {
 
               {/* Payment Method */}
               <div>
-                <label className="label">{he ? 'אמצעי תשלום' : 'Payment Method'}</label>
+                <label className="label">{he ? 'אמצעי תשלום' : 'Payment Method'} *</label>
                 <select
                   className="input w-full"
                   value={form.method}
                   onChange={e => setForm(f => ({ ...f, method: e.target.value }))}
+                  required
                 >
                   <option value="">{he ? '— בחר אמצעי —' : '— Select method —'}</option>
                   <option value="cash">{T.cash}</option>
@@ -430,7 +431,7 @@ export default function PaymentsPage() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button type="submit" disabled={saving || !form.member_id} className="btn-primary flex-1">
+                <button type="submit" disabled={saving || !form.member_id || !form.method} className="btn-primary flex-1">
                   {saving ? T.loading : T.save}
                 </button>
                 <button type="button" onClick={() => { setShowForm(false); setEditing(null) }} className="btn-secondary flex-1">
