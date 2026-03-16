@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
 
     // Payments: period = Hebrew date, description = "תשלום - method"
     for (const pay of payments ?? []) {
-      const methodLabel = pay.method ? (methodLabels[pay.method] || pay.method) : ''
+      const methodLabel = (pay.method && pay.method !== 'unknown') ? (methodLabels[pay.method] || pay.method) : ''
       const hebrewDate = formatHebrewDate(pay.date, 'he')
       const desc = methodLabel
         ? `תשלום - ${methodLabel}${pay.reference ? ` (${pay.reference})` : ''}`

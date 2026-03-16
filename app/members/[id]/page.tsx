@@ -124,6 +124,7 @@ export default function MemberDetailPage() {
     if (m === 'bank') return T.bankTransfer
     if (m === 'check') return T.check
     if (m === 'credit_card') return lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'
+    if (m === 'unknown') return T.unknown
     return m
   }
 
@@ -347,6 +348,7 @@ export default function MemberDetailPage() {
                   <option value="bank">{T.bankTransfer}</option>
                   <option value="check">{T.check}</option>
                   <option value="credit_card">{lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'}</option>
+                  <option value="unknown">{T.unknown}</option>
                 </select>
               </div>
               <div>

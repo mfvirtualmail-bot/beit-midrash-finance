@@ -61,6 +61,7 @@ export default function PaymentsPage() {
       case 'bank': return T.bankTransfer
       case 'check': return T.check
       case 'credit_card': return he ? 'כרטיס אשראי' : 'Credit Card'
+      case 'unknown': return T.unknown
       default: return m
     }
   }
@@ -415,6 +416,7 @@ export default function PaymentsPage() {
                   <option value="check">{T.check}</option>
                   <option value="bank">{T.bankTransfer}</option>
                   <option value="credit_card">{he ? 'כרטיס אשראי' : 'Credit Card'}</option>
+                  <option value="unknown">{T.unknown}</option>
                 </select>
               </div>
 

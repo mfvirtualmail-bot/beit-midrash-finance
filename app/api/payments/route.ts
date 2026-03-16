@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
     const userId = await getSessionUser(req.cookies.get(COOKIE_NAME)?.value)
     const { member_id, amount, date, method, reference, notes } = await req.json()
 
-    if (!amount || !member_id || !method) {
-      return NextResponse.json({ error: 'member_id, amount, and method are required' }, { status: 400 })
+    if (!amount || !member_id) {
+      return NextResponse.json({ error: 'member_id and amount are required' }, { status: 400 })
     }
 
     const paymentDate = date || new Date().toISOString().split('T')[0]
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         member_id: Number(member_id),
         amount: Number(amount),
         date: paymentDate,
-        method: method,
+        method: method || 'unknown',
         reference: reference || null,
         notes: notes || null,
         created_by: userId,
