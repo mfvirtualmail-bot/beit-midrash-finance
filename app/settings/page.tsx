@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
@@ -18,6 +18,8 @@ interface OrgSettings {
   invoice_footer_en: string
   statement_header_html: string
   statement_footer_html: string
+  resend_api_key: string
+  email_sender: string
 }
 
 const DEFAULTS: OrgSettings = {
@@ -32,6 +34,8 @@ const DEFAULTS: OrgSettings = {
   invoice_footer_en: '',
   statement_header_html: '',
   statement_footer_html: '',
+  resend_api_key: '',
+  email_sender: '',
 }
 
 export default function SettingsPage() {
@@ -315,6 +319,45 @@ export default function SettingsPage() {
               <div className="bg-white border rounded-lg p-4" dir="rtl" dangerouslySetInnerHTML={{ __html: form.statement_footer_html }} />
             </div>
           )}
+        </div>
+
+        {/* Email Settings */}
+        <div className="card space-y-4">
+          <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+            <Mail size={16} className="text-purple-500" />
+            {lang === 'he' ? 'הגדרות אימייל' : 'Email Settings'}
+          </h2>
+          <p className="text-xs text-gray-500">
+            {lang === 'he'
+              ? 'הגדר את שירות Resend לשליחת דפי חשבון ואישורי תשלום באימייל לחברים.'
+              : 'Configure Resend service for sending statements and payment confirmations via email.'}
+          </p>
+          <div>
+            <label className="label">{lang === 'he' ? 'מפתח API של Resend' : 'Resend API Key'}</label>
+            <input
+              dir="ltr"
+              type="password"
+              className="input w-full font-mono text-sm"
+              placeholder="re_..."
+              {...f('resend_api_key')}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              {lang === 'he' ? 'ניתן להשיג מ-resend.com' : 'Get from resend.com'}
+            </p>
+          </div>
+          <div>
+            <label className="label">{lang === 'he' ? 'כתובת שולח' : 'Sender Email Address'}</label>
+            <input
+              dir="ltr"
+              type="email"
+              className="input w-full text-sm"
+              placeholder="noreply@yourdomain.com"
+              {...f('email_sender')}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              {lang === 'he' ? 'כתובת ששולחת את המיילים. ברירת מחדל: onboarding@resend.dev' : 'Address emails are sent from. Default: onboarding@resend.dev'}
+            </p>
+          </div>
         </div>
 
         {/* Legacy plain text header/footer (kept for backward compatibility) */}

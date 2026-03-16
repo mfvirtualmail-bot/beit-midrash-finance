@@ -250,6 +250,14 @@ export const translations = {
     totalAmount: 'סכום כולל',
     paymentRecorded: 'התשלום נרשם בהצלחה',
     backToPayments: 'חזרה לתשלומים',
+    // Email
+    sendStatementEmail: 'שלח דף חשבון באימייל',
+    sendingEmail: 'שולח...',
+    emailSent: 'האימייל נשלח בהצלחה',
+    emailFailed: 'שגיאה בשליחת האימייל',
+    sendPaymentConfirmation: 'שלח אישור תשלום באימייל?',
+    emailSettings: 'הגדרות אימייל',
+    noMemberEmail: 'לחבר אין כתובת אימייל',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -500,6 +508,14 @@ export const translations = {
     totalAmount: 'Total Amount',
     paymentRecorded: 'Payment recorded successfully',
     backToPayments: 'Back to Payments',
+    // Email
+    sendStatementEmail: 'Send Statement via Email',
+    sendingEmail: 'Sending...',
+    emailSent: 'Email sent successfully',
+    emailFailed: 'Failed to send email',
+    sendPaymentConfirmation: 'Send payment confirmation email?',
+    emailSettings: 'Email Settings',
+    noMemberEmail: 'Member has no email address',
   }
 }
 

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Plus, Search, Trash2, Upload, CheckCircle, Banknote, Pencil, X } from 'lucide-react'
+import { Plus, Search, Trash2, Upload, CheckCircle, Banknote, Pencil, X, Mail, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface Payment {
@@ -40,6 +40,8 @@ export default function PaymentsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [successMsg, setSuccessMsg] = useState('')
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [emailPrompt, setEmailPrompt] = useState<{ memberId: number; amount: number; date: string; memberName: string } | null>(null)
+  const [sendingConfirmation, setSendingConfirmation] = useState(false)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -140,9 +142,17 @@ export default function PaymentsPage() {
           }),
         })
         if (res.ok) {
+          const memberName = members.find(m => m.id === Number(form.member_id))?.name || ''
           setShowForm(false)
           setSuccessMsg(he ? 'התשלום נרשם בהצלחה' : 'Payment recorded successfully')
           setTimeout(() => setSuccessMsg(''), 3000)
+          // Show email confirmation prompt
+          setEmailPrompt({
+            memberId: Number(form.member_id),
+            amount: Number(form.amount),
+            date: form.date || new Date().toISOString().split('T')[0],
+            memberName,
+          })
           load()
         }
       }
@@ -453,6 +463,64 @@ export default function PaymentsPage() {
             <div className="flex gap-3 justify-center">
               <button onClick={() => setDeleteId(null)} className="btn-secondary">{T.cancel}</button>
               <button onClick={() => handleDelete(deleteId)} className="btn-danger">{T.delete}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email confirmation prompt after payment */}
+      {emailPrompt && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center">
+            <div className="mb-4">
+              <Mail size={32} className="mx-auto text-purple-500 mb-3" />
+              <p className="text-lg font-medium mb-2">
+                {he ? 'שלח אישור תשלום באימייל?' : 'Send payment confirmation email?'}
+              </p>
+              <p className="text-sm text-gray-500">
+                {emailPrompt.memberName} — €{Number(emailPrompt.amount).toFixed(2)}
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={async () => {
+                  setSendingConfirmation(true)
+                  try {
+                    const res = await fetch('/api/email/payment-confirmation', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        member_id: emailPrompt.memberId,
+                        payment_amount: emailPrompt.amount,
+                        payment_date: emailPrompt.date,
+                      }),
+                    })
+                    const data = await res.json()
+                    if (res.ok) {
+                      setSuccessMsg(he ? 'אישור תשלום נשלח באימייל' : 'Payment confirmation email sent')
+                    } else {
+                      setSuccessMsg(data.error || (he ? 'שגיאה בשליחת אימייל' : 'Failed to send email'))
+                    }
+                  } catch {
+                    setSuccessMsg(he ? 'שגיאת רשת' : 'Network error')
+                  }
+                  setSendingConfirmation(false)
+                  setEmailPrompt(null)
+                  setTimeout(() => setSuccessMsg(''), 5000)
+                }}
+                disabled={sendingConfirmation}
+                className="btn-primary flex items-center gap-2"
+              >
+                {sendingConfirmation ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+                {sendingConfirmation ? (he ? 'שולח...' : 'Sending...') : (he ? 'כן, שלח' : 'Yes, Send')}
+              </button>
+              <button
+                onClick={() => setEmailPrompt(null)}
+                disabled={sendingConfirmation}
+                className="btn-secondary"
+              >
+                {he ? 'לא, תודה' : 'No, Thanks'}
+              </button>
             </div>
           </div>
         </div>
