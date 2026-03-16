@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         member_id: Number(member_id),
         amount: Number(amount),
         date: paymentDate,
-        method: method || null,
+        method: method || 'unknown',
         reference: reference || null,
         notes: notes || null,
         created_by: userId,

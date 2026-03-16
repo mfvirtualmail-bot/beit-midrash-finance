@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       const { data: payments } = await pq
       for (const p of payments ?? []) {
         const memberName = ((p.members as unknown) as { name: string } | null)?.name || ''
-        const methodLabel = p.method ? (METHOD_LABELS[p.method] || p.method) : ''
+        const methodLabel = (p.method && p.method !== 'unknown') ? (METHOD_LABELS[p.method] || p.method) : ''
         const descHe = methodLabel ? `תשלום - ${memberName} - ${methodLabel}` : `תשלום - ${memberName}`
         const descEn = methodLabel ? `Payment - ${memberName} - ${methodLabel}` : `Payment - ${memberName}`
         transactions.push({

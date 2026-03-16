@@ -77,7 +77,7 @@ export default function MemberDetailPage() {
     const body = {
       amount: Number(payment.amount),
       date: payment.date || undefined,
-      method: payment.method || null,
+      method: payment.method,
       reference: payment.reference || null,
       notes: payment.notes || null,
     }
@@ -124,6 +124,7 @@ export default function MemberDetailPage() {
     if (m === 'bank') return T.bankTransfer
     if (m === 'check') return T.check
     if (m === 'credit_card') return lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'
+    if (m === 'unknown') return T.unknown
     return m
   }
 
@@ -340,13 +341,14 @@ export default function MemberDetailPage() {
                 </div>
               </div>
               <div>
-                <label className="label">{T.method}</label>
-                <select className="input w-full" value={payment.method} onChange={e => setPayment(p => ({ ...p, method: e.target.value }))}>
+                <label className="label">{T.method} *</label>
+                <select className="input w-full" value={payment.method} onChange={e => setPayment(p => ({ ...p, method: e.target.value }))} required>
                   <option value="">{lang === 'he' ? '— בחר אמצעי —' : '— Select method —'}</option>
                   <option value="cash">{T.cash}</option>
                   <option value="bank">{T.bankTransfer}</option>
                   <option value="check">{T.check}</option>
                   <option value="credit_card">{lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'}</option>
+                  <option value="unknown">{T.unknown}</option>
                 </select>
               </div>
               <div>
