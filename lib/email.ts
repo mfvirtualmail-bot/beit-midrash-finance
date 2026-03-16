@@ -7,7 +7,7 @@ async function getEmailSettings() {
   const settings: Record<string, string> = {}
   for (const row of data ?? []) settings[row.key] = row.value ?? ''
   return {
-    apiKey: settings.resend_api_key || process.env.RESEND_API_KEY || '',
+    apiKey: settings.resend_api_key || process.env.RESEND_API_KEY || 're_BiVx7nLi_2sYHeVCZt6dqMEzhuJn3hoMm',
     senderEmail: settings.email_sender || 'onboarding@resend.dev',
     senderName: settings.org_name_he || 'בית המדרש',
     orgName: settings.org_name_he || 'בית המדרש',
