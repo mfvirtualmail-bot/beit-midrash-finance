@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Phone, Mail, MapPin, FileText, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Phone, Mail, MapPin, FileText, Pencil, X, Send, Loader2 } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
 // hebrewDate utils no longer needed in this page (generate modal removed)
 import Link from 'next/link'
@@ -39,7 +39,12 @@ export default function MemberDetailPage() {
   const [payment, setPayment] = useState({ amount: '', date: TODAY, method: '', reference: '', notes: '' })
   const [savingPayment, setSavingPayment] = useState(false)
 
-  // (Generate invoice modal removed — now using dynamic statement view)
+  // Email statement
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailMsg, setEmailMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  // Payment email prompt
+  const [paymentEmailPrompt, setPaymentEmailPrompt] = useState<{ amount: number; date: string } | null>(null)
+  const [sendingPaymentEmail, setSendingPaymentEmail] = useState(false)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -88,11 +93,15 @@ export default function MemberDetailPage() {
         body: JSON.stringify(body),
       })
     } else {
-      await fetch(`/api/members/${id}/payments`, {
+      const res = await fetch(`/api/members/${id}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
+      // Show email prompt for new payments
+      if (res.ok && data?.member.email) {
+        setPaymentEmailPrompt({ amount: Number(payment.amount), date: payment.date || TODAY })
+      }
     }
     setShowPayment(false)
     setEditingPayment(null)
@@ -116,6 +125,31 @@ export default function MemberDetailPage() {
   async function deletePayment(paymentId: number) {
     await fetch(`/api/members/${id}/payments/${paymentId}`, { method: 'DELETE' })
     load()
+  }
+
+  async function handleSendStatementEmail() {
+    if (!data?.member.email) {
+      setEmailMsg({ type: 'err', text: lang === 'he' ? 'לחבר אין כתובת אימייל' : 'Member has no email address' })
+      setTimeout(() => setEmailMsg(null), 4000)
+      return
+    }
+    setSendingEmail(true)
+    setEmailMsg(null)
+    try {
+      const fd = new FormData()
+      fd.append('member_id', id)
+      const res = await fetch('/api/email/send-statement', { method: 'POST', body: fd })
+      const result = await res.json()
+      if (res.ok) {
+        setEmailMsg({ type: 'ok', text: lang === 'he' ? 'האימייל נשלח בהצלחה' : 'Email sent successfully' })
+      } else {
+        setEmailMsg({ type: 'err', text: result.error || (lang === 'he' ? 'שגיאה בשליחה' : 'Failed to send') })
+      }
+    } catch {
+      setEmailMsg({ type: 'err', text: lang === 'he' ? 'שגיאת רשת' : 'Network error' })
+    }
+    setSendingEmail(false)
+    setTimeout(() => setEmailMsg(null), 5000)
   }
 
   const methodLabel = (m: string | null) => {
@@ -147,14 +181,33 @@ export default function MemberDetailPage() {
             {member.address && <span className="flex items-center gap-1"><MapPin size={12} />{member.address}</span>}
           </div>
         </div>
-        <Link
-          href={`/invoices?view=${id}`}
-          className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium transition-colors"
-        >
-          <FileText size={15} />
-          {lang === 'he' ? 'צפה בדף חשבון' : 'View Statement'}
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/invoices?view=${id}`}
+            className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium transition-colors"
+          >
+            <FileText size={15} />
+            {lang === 'he' ? 'צפה בדף חשבון' : 'View Statement'}
+          </Link>
+          <button
+            onClick={handleSendStatementEmail}
+            disabled={sendingEmail || !member.email}
+            title={!member.email ? (lang === 'he' ? 'לחבר אין כתובת אימייל' : 'No email address') : ''}
+            className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 border border-purple-300 text-purple-800 hover:bg-purple-100 rounded-xl font-medium transition-colors disabled:opacity-50"
+          >
+            {sendingEmail ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            {sendingEmail ? (lang === 'he' ? 'שולח...' : 'Sending...') : (lang === 'he' ? 'שלח באימייל' : 'Email Statement')}
+          </button>
+        </div>
       </div>
+
+      {/* Email message */}
+      {emailMsg && (
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${emailMsg.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {emailMsg.type === 'ok' ? <Mail size={16} /> : <X size={16} />}
+          {emailMsg.text}
+        </div>
+      )}
 
       {/* Balance summary */}
       <div className="grid grid-cols-3 gap-4">
@@ -368,7 +421,63 @@ export default function MemberDetailPage() {
         </div>
       )}
 
-      {/* (Generate Statement modal removed — now uses dynamic "View Statement" link to /invoices?view=id) */}
+      {/* Payment email confirmation prompt */}
+      {paymentEmailPrompt && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center">
+            <div className="mb-4">
+              <Mail size={32} className="mx-auto text-purple-500 mb-3" />
+              <p className="text-lg font-medium mb-2">
+                {lang === 'he' ? 'שלח אישור תשלום באימייל?' : 'Send payment confirmation email?'}
+              </p>
+              <p className="text-sm text-gray-500">
+                {member.name} — €{paymentEmailPrompt.amount.toFixed(2)}
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={async () => {
+                  setSendingPaymentEmail(true)
+                  try {
+                    const res = await fetch('/api/email/payment-confirmation', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        member_id: Number(id),
+                        payment_amount: paymentEmailPrompt.amount,
+                        payment_date: paymentEmailPrompt.date,
+                      }),
+                    })
+                    const result = await res.json()
+                    if (res.ok) {
+                      setEmailMsg({ type: 'ok', text: lang === 'he' ? 'אישור תשלום נשלח באימייל' : 'Payment confirmation sent' })
+                    } else {
+                      setEmailMsg({ type: 'err', text: result.error || (lang === 'he' ? 'שגיאה בשליחה' : 'Failed to send') })
+                    }
+                  } catch {
+                    setEmailMsg({ type: 'err', text: lang === 'he' ? 'שגיאת רשת' : 'Network error' })
+                  }
+                  setSendingPaymentEmail(false)
+                  setPaymentEmailPrompt(null)
+                  setTimeout(() => setEmailMsg(null), 5000)
+                }}
+                disabled={sendingPaymentEmail}
+                className="btn-primary flex items-center gap-2"
+              >
+                {sendingPaymentEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+                {sendingPaymentEmail ? (lang === 'he' ? 'שולח...' : 'Sending...') : (lang === 'he' ? 'כן, שלח' : 'Yes, Send')}
+              </button>
+              <button
+                onClick={() => setPaymentEmailPrompt(null)}
+                disabled={sendingPaymentEmail}
+                className="btn-secondary"
+              >
+                {lang === 'he' ? 'לא, תודה' : 'No, Thanks'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { useLang } from '@/lib/LangContext'
 import { Member } from '@/lib/db'
 import { getCurrentHebrewYear, getRecentHebrewYears, hebrewYearToGregorianRange } from '@/lib/hebrewDate'
 import { generatePdfFromElement, generateMultiMemberPdf, downloadBlob, createPdfPreviewUrl } from '@/lib/pdfGenerator'
-import { FileText, Eye, Download, Search, X, Loader2 } from 'lucide-react'
+import { FileText, Eye, Download, Search, X, Loader2, Send, Mail } from 'lucide-react'
 import Link from 'next/link'
 
 // Wrapper to satisfy Next.js Suspense requirement for useSearchParams
@@ -60,6 +60,10 @@ function StatementsPage() {
   const [previewMemberIds, setPreviewMemberIds] = useState<number[]>([])
   const [previewMemberName, setPreviewMemberName] = useState('')
   const renderContainerRef = useRef<HTMLDivElement>(null)
+
+  // Email state
+  const [sendingEmail, setSendingEmail] = useState<number | null>(null) // member_id being emailed
+  const [emailMsg, setEmailMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -213,6 +217,29 @@ function StatementsPage() {
     generatePdf(previewMemberIds, true, previewMemberName)
   }
 
+  async function sendStatementEmail(memberId: number) {
+    setSendingEmail(memberId)
+    setEmailMsg(null)
+    try {
+      const range = hebrewYearToGregorianRange(viewYear || selectedYear)
+      const fd = new FormData()
+      fd.append('member_id', String(memberId))
+      fd.append('date_from', range.start)
+      fd.append('date_to', range.end)
+      const res = await fetch('/api/email/send-statement', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (res.ok) {
+        setEmailMsg({ type: 'ok', text: he ? 'האימייל נשלח בהצלחה' : 'Email sent successfully' })
+      } else {
+        setEmailMsg({ type: 'err', text: data.error || (he ? 'שגיאה בשליחה' : 'Failed to send') })
+      }
+    } catch {
+      setEmailMsg({ type: 'err', text: he ? 'שגיאת רשת' : 'Network error' })
+    }
+    setSendingEmail(null)
+    setTimeout(() => setEmailMsg(null), 5000)
+  }
+
   return (
     <div className="space-y-6">
       {/* Hidden container for PDF rendering */}
@@ -278,6 +305,14 @@ function StatementsPage() {
         </div>
       )}
 
+      {/* Email message */}
+      {emailMsg && (
+        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${emailMsg.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+          {emailMsg.type === 'ok' ? <Mail size={16} /> : <X size={16} />}
+          {emailMsg.text}
+        </div>
+      )}
+
       {/* Members table */}
       <div className="card overflow-x-auto p-0">
         {loading ? (
@@ -336,6 +371,14 @@ function StatementsPage() {
                       >
                         <Download size={15} />
                       </button>
+                      <button
+                        onClick={() => sendStatementEmail(m.id)}
+                        disabled={sendingEmail === m.id || !m.email}
+                        className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg disabled:opacity-50"
+                        title={!m.email ? (he ? 'אין כתובת אימייל' : 'No email') : (he ? 'שלח באימייל' : 'Send Email')}
+                      >
+                        {sendingEmail === m.id ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -373,6 +416,14 @@ function StatementsPage() {
                 >
                   {pdfGenerating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                   {he ? 'הורד PDF' : 'Download'}
+                </button>
+                <button
+                  onClick={() => sendStatementEmail(viewMember.id)}
+                  disabled={sendingEmail === viewMember.id}
+                  className="flex items-center gap-1 text-sm px-3 py-2 bg-purple-50 border border-purple-300 text-purple-800 hover:bg-purple-100 rounded-xl font-medium disabled:opacity-50"
+                >
+                  {sendingEmail === viewMember.id ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  {he ? 'שלח באימייל' : 'Email'}
                 </button>
                 <button
                   onClick={() => { setViewMember(null); setStatementData(null) }}

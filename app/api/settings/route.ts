@@ -13,6 +13,8 @@ const DEFAULTS: Record<string, string> = {
   invoice_footer_en: '',
   statement_header_html: '',
   statement_footer_html: '',
+  resend_api_key: '',
+  email_sender: '',
 }
 
 export async function GET() {
