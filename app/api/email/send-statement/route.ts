@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { sendStatementEmail } from '@/lib/email'
 import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
+import { generateStatementPage, wrapStatementHtml, getStatementSettings } from '@/lib/statementHtml'
+import type { StatementLine } from '@/lib/statementHtml'
 
 // POST /api/email/send-statement
 // Content-Type: multipart/form-data
@@ -98,26 +100,27 @@ export async function POST(req: NextRequest) {
     const balance = totalCharged - totalPaid
 
     // Prepare PDF attachment
-    let pdfBuffer: Buffer | undefined
-    let pdfFileName = `דף_חשבון_${member.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+    let pdfBuffer: Buffer
+    let pdfFileName = `דף_חשבון_${member.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`
 
     if (pdfFile) {
       // Client sent a generated PDF
       pdfBuffer = Buffer.from(await pdfFile.arrayBuffer())
+      pdfFileName = pdfFileName.replace('.html', '.pdf')
     } else {
-      // Generate HTML-based PDF as fallback — fetch the statement HTML
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
-        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
-      let pdfParams = `member_ids=${memberId}`
-      if (dateFrom) pdfParams += `&date_from=${dateFrom}`
-      if (dateTo) pdfParams += `&date_to=${dateTo}`
-
-      const pdfHtmlRes = await fetch(`${baseUrl}/api/statements/pdf?${pdfParams}`, {
-        headers: { Cookie: req.headers.get('cookie') || '' },
-      })
-      const htmlContent = await pdfHtmlRes.text()
+      // Generate statement HTML inline (no external fetch — avoids Vercel auth issues)
+      const stmtSettings = await getStatementSettings()
+      const stmtLines: StatementLine[] = lines.map(l => ({
+        date: l.date,
+        period: l.period,
+        description: l.description,
+        charge: l.charge,
+        payment: l.payment,
+        lineType: l.lineType as StatementLine['lineType'],
+      }))
+      const page = generateStatementPage({ name: member.name, address: member.address }, stmtLines, stmtSettings)
+      const htmlContent = wrapStatementHtml([page])
       pdfBuffer = Buffer.from(htmlContent, 'utf-8')
-      pdfFileName = pdfFileName.replace('.pdf', '.html')
     }
 
     await sendStatementEmail(
