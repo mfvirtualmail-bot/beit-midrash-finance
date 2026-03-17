@@ -1,10 +1,16 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail, CreditCard, Plus, X, GripVertical } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
+
+interface PaymentMethod {
+  value: string
+  label_he: string
+  label_en: string
+}
 
 interface OrgSettings {
   org_name_he: string
@@ -50,10 +56,23 @@ export default function SettingsPage() {
   const [migrating, setMigrating] = useState(false)
   const [migrateMsg, setMigrateMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [showPreview, setShowPreview] = useState<'header' | 'footer' | null>(null)
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
+    { value: 'cash', label_he: 'מזומן', label_en: 'Cash' },
+    { value: 'check', label_he: 'צ׳ק', label_en: 'Check' },
+    { value: 'bank_transfer', label_he: 'העברה בנקאית', label_en: 'Bank Transfer' },
+    { value: 'credit_card', label_he: 'כרטיס אשראי', label_en: 'Credit Card' },
+  ])
+  const [newMethod, setNewMethod] = useState<PaymentMethod>({ value: '', label_he: '', label_en: '' })
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(data => {
-      if (data && !data.error) setForm({ ...DEFAULTS, ...data })
+      if (data && !data.error) {
+        const { payment_methods, ...rest } = data
+        setForm({ ...DEFAULTS, ...rest })
+        if (Array.isArray(payment_methods) && payment_methods.length > 0) {
+          setPaymentMethods(payment_methods)
+        }
+      }
       setLoading(false)
     })
     fetch('/api/settings/logo').then(r => r.json()).then(data => {
@@ -123,7 +142,7 @@ export default function SettingsPage() {
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, payment_methods: paymentMethods }),
     })
     if (res.ok) {
       setMsg({ type: 'ok', text: T.settingsSaved })
@@ -394,6 +413,116 @@ export default function SettingsPage() {
           {saving ? T.loading : T.save}
         </button>
       </form>
+
+      {/* Payment Methods */}
+      <div className="card space-y-4">
+        <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+          <CreditCard size={16} className="text-indigo-500" />
+          {lang === 'he' ? 'אמצעי תשלום' : 'Payment Methods'}
+        </h2>
+        <p className="text-xs text-gray-500">
+          {lang === 'he'
+            ? 'הגדר את אפשרויות התשלום שיופיעו בתפריט הנפתח בטפסי תשלום. המשתמש תמיד יוכל להזין ערך חופשי.'
+            : 'Configure the payment options shown in the dropdown on payment forms. Users can always enter a custom value.'}
+        </p>
+
+        {/* Existing methods */}
+        <div className="space-y-2">
+          {paymentMethods.map((method, idx) => (
+            <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+              <GripVertical size={14} className="text-gray-400 shrink-0" />
+              <input
+                className="input flex-1 text-sm"
+                dir="rtl"
+                value={method.label_he}
+                onChange={e => {
+                  const updated = [...paymentMethods]
+                  updated[idx] = { ...updated[idx], label_he: e.target.value }
+                  setPaymentMethods(updated)
+                }}
+                placeholder={lang === 'he' ? 'שם בעברית' : 'Hebrew label'}
+              />
+              <input
+                className="input flex-1 text-sm"
+                dir="ltr"
+                value={method.label_en}
+                onChange={e => {
+                  const updated = [...paymentMethods]
+                  updated[idx] = { ...updated[idx], label_en: e.target.value }
+                  setPaymentMethods(updated)
+                }}
+                placeholder={lang === 'he' ? 'שם באנגלית' : 'English label'}
+              />
+              <span className="text-xs text-gray-400 font-mono shrink-0 w-24 truncate" title={method.value}>{method.value}</span>
+              <button
+                type="button"
+                onClick={() => setPaymentMethods(paymentMethods.filter((_, i) => i !== idx))}
+                className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded shrink-0"
+                title={lang === 'he' ? 'הסר' : 'Remove'}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add new method */}
+        <div className="flex items-end gap-2 border-t border-gray-100 pt-3">
+          <div className="flex-1">
+            <label className="text-xs text-gray-500 mb-1 block">{lang === 'he' ? 'מזהה (אנגלית, ללא רווחים)' : 'Key (English, no spaces)'}</label>
+            <input
+              className="input w-full text-sm"
+              dir="ltr"
+              value={newMethod.value}
+              onChange={e => setNewMethod(m => ({ ...m, value: e.target.value.replace(/\s/g, '_').toLowerCase() }))}
+              placeholder="e.g. paypal"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-gray-500 mb-1 block">{lang === 'he' ? 'שם בעברית' : 'Hebrew label'}</label>
+            <input
+              className="input w-full text-sm"
+              dir="rtl"
+              value={newMethod.label_he}
+              onChange={e => setNewMethod(m => ({ ...m, label_he: e.target.value }))}
+              placeholder={lang === 'he' ? 'פייפאל' : 'Hebrew name'}
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-gray-500 mb-1 block">{lang === 'he' ? 'שם באנגלית' : 'English label'}</label>
+            <input
+              className="input w-full text-sm"
+              dir="ltr"
+              value={newMethod.label_en}
+              onChange={e => setNewMethod(m => ({ ...m, label_en: e.target.value }))}
+              placeholder="PayPal"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={!newMethod.value || !newMethod.label_he}
+            onClick={() => {
+              if (paymentMethods.some(m => m.value === newMethod.value)) {
+                setMsg({ type: 'err', text: lang === 'he' ? 'מזהה זה כבר קיים' : 'This key already exists' })
+                setTimeout(() => setMsg(null), 3000)
+                return
+              }
+              setPaymentMethods([...paymentMethods, { ...newMethod }])
+              setNewMethod({ value: '', label_he: '', label_en: '' })
+            }}
+            className="flex items-center gap-1 text-sm px-3 py-2 bg-indigo-50 border border-indigo-300 text-indigo-700 hover:bg-indigo-100 rounded-xl font-medium disabled:opacity-40 shrink-0"
+          >
+            <Plus size={14} />
+            {lang === 'he' ? 'הוסף' : 'Add'}
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-400 italic">
+          {lang === 'he'
+            ? 'שינויים יישמרו כשתלחץ על "שמור" למעלה.'
+            : 'Changes are saved when you click "Save" above.'}
+        </p>
+      </div>
 
       {/* Database Migration */}
       <div className="card space-y-4">
