@@ -42,8 +42,19 @@ export default function PaymentsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [emailPrompt, setEmailPrompt] = useState<{ memberId: number; amount: number; date: string; memberName: string } | null>(null)
   const [sendingConfirmation, setSendingConfirmation] = useState(false)
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ value: string; label_he: string; label_en: string }>>([])
+  const [customMethod, setCustomMethod] = useState('')
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  // Load payment methods from settings
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(data => {
+      if (Array.isArray(data?.payment_methods)) {
+        setPaymentMethods(data.payment_methods)
+      }
+    })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -58,9 +69,12 @@ export default function PaymentsPage() {
 
   const methodLabel = (m: string | null) => {
     if (!m) return '—'
+    const found = paymentMethods.find(pm => pm.value === m)
+    if (found) return he ? found.label_he : found.label_en
+    // Legacy fallback
     switch (m) {
       case 'cash': return T.cash
-      case 'bank': return T.bankTransfer
+      case 'bank': case 'bank_transfer': return T.bankTransfer
       case 'check': return T.check
       case 'credit_card': return he ? 'כרטיס אשראי' : 'Credit Card'
       case 'unknown': return T.unknown
@@ -104,7 +118,8 @@ export default function PaymentsPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.member_id || !form.amount || !form.method) return
+    const actualMethod = form.method === '__custom__' ? customMethod : form.method
+    if (!form.member_id || !form.amount || !actualMethod) return
     setSaving(true)
     try {
       if (editing) {
@@ -115,7 +130,7 @@ export default function PaymentsPage() {
           body: JSON.stringify({
             amount: Number(form.amount),
             date: form.date || undefined,
-            method: form.method || 'unknown',
+            method: actualMethod || 'unknown',
             reference: form.hebrewDateText || form.reference || undefined,
             notes: form.notes || undefined,
           }),
@@ -123,6 +138,7 @@ export default function PaymentsPage() {
         if (res.ok) {
           setShowForm(false)
           setEditing(null)
+          setCustomMethod('')
           setSuccessMsg(he ? 'התשלום עודכן בהצלחה' : 'Payment updated successfully')
           setTimeout(() => setSuccessMsg(''), 3000)
           load()
@@ -136,7 +152,7 @@ export default function PaymentsPage() {
             member_id: Number(form.member_id),
             amount: Number(form.amount),
             date: form.date || undefined,
-            method: form.method || 'unknown',
+            method: actualMethod || 'unknown',
             reference: form.hebrewDateText || form.reference || undefined,
             notes: form.notes || undefined,
           }),
@@ -417,17 +433,35 @@ export default function PaymentsPage() {
                 <label className="label">{he ? 'אמצעי תשלום' : 'Payment Method'} *</label>
                 <select
                   className="input w-full"
-                  value={form.method}
-                  onChange={e => setForm(f => ({ ...f, method: e.target.value }))}
-                  required
+                  value={form.method === '__custom__' ? '__custom__' : form.method}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (v === '__custom__') {
+                      setForm(f => ({ ...f, method: '__custom__' }))
+                      setCustomMethod('')
+                    } else {
+                      setForm(f => ({ ...f, method: v }))
+                      setCustomMethod('')
+                    }
+                  }}
+                  required={form.method !== '__custom__'}
                 >
                   <option value="">{he ? '— בחר אמצעי —' : '— Select method —'}</option>
-                  <option value="cash">{T.cash}</option>
-                  <option value="check">{T.check}</option>
-                  <option value="bank">{T.bankTransfer}</option>
-                  <option value="credit_card">{he ? 'כרטיס אשראי' : 'Credit Card'}</option>
-                  <option value="unknown">{T.unknown}</option>
+                  {paymentMethods.map(pm => (
+                    <option key={pm.value} value={pm.value}>{he ? pm.label_he : pm.label_en}</option>
+                  ))}
+                  <option value="__custom__">{he ? 'אחר...' : 'Other...'}</option>
                 </select>
+                {form.method === '__custom__' && (
+                  <input
+                    className="input w-full mt-2"
+                    value={customMethod}
+                    onChange={e => setCustomMethod(e.target.value)}
+                    placeholder={he ? 'הקלד אמצעי תשלום...' : 'Type payment method...'}
+                    required
+                    autoFocus
+                  />
+                )}
               </div>
 
               {/* Notes */}
@@ -443,7 +477,7 @@ export default function PaymentsPage() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button type="submit" disabled={saving || !form.member_id || !form.method} className="btn-primary flex-1">
+                <button type="submit" disabled={saving || !form.member_id || (!form.method || (form.method === '__custom__' && !customMethod))} className="btn-primary flex-1">
                   {saving ? T.loading : T.save}
                 </button>
                 <button type="button" onClick={() => { setShowForm(false); setEditing(null) }} className="btn-secondary flex-1">
