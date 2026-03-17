@@ -82,7 +82,7 @@ export default function MemberDetailPage() {
     const body = {
       amount: Number(payment.amount),
       date: payment.date || undefined,
-      method: payment.method,
+      method: payment.method || 'unknown',
       reference: payment.reference || null,
       notes: payment.notes || null,
     }

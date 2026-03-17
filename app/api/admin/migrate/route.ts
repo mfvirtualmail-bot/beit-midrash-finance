@@ -33,6 +33,10 @@ ALTER TABLE member_payments ALTER COLUMN method DROP DEFAULT;
 -- v7: Clean up existing 'cash' defaults — set to NULL where method was auto-filled
 -- This converts all existing 'cash' entries to NULL so statements show blank
 UPDATE member_payments SET method = NULL WHERE method = 'cash';
+
+-- v8: Set all NULL and 'cash' payment methods to 'unknown'
+-- Users who imported payments without specifying method got 'cash' default or NULL
+UPDATE member_payments SET method = 'unknown' WHERE method IS NULL OR method = 'cash';
 `
 
 export async function POST() {
