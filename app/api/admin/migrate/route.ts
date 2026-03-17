@@ -37,6 +37,10 @@ UPDATE member_payments SET method = NULL WHERE method = 'cash';
 -- v8: Set all NULL and 'cash' payment methods to 'unknown'
 -- Users who imported payments without specifying method got 'cash' default or NULL
 UPDATE member_payments SET method = 'unknown' WHERE method IS NULL OR method = 'cash';
+
+-- v9: Change default from 'cash' to 'unknown' and clean up any remaining 'cash' entries
+ALTER TABLE member_payments ALTER COLUMN method SET DEFAULT 'unknown';
+UPDATE member_payments SET method = 'unknown' WHERE method = 'cash';
 `
 
 export async function POST() {

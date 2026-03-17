@@ -70,7 +70,7 @@ create table if not exists member_payments (
   member_id bigint not null references members(id) on delete cascade,
   amount numeric(12,2) not null,
   date date not null,
-  method text not null default 'cash',
+  method text default 'unknown',
   reference text,
   notes text,
   created_at timestamptz default now(),
