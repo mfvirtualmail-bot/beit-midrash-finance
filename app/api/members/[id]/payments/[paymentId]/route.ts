@@ -7,7 +7,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
     const updates: Record<string, unknown> = {}
     if (amount !== undefined) updates.amount = Number(amount)
     if (date !== undefined) updates.date = date
-    if (method !== undefined) updates.method = method || null
+    if (method !== undefined) updates.method = method || 'unknown'
     if (reference !== undefined) updates.reference = reference || null
     if (notes !== undefined) updates.notes = notes || null
 

@@ -113,7 +113,7 @@ export default function PaymentsPage() {
           body: JSON.stringify({
             amount: Number(form.amount),
             date: form.date || undefined,
-            method: form.method || null,
+            method: form.method || 'unknown',
             reference: form.hebrewDateText || form.reference || undefined,
             notes: form.notes || undefined,
           }),
@@ -134,7 +134,7 @@ export default function PaymentsPage() {
             member_id: Number(form.member_id),
             amount: Number(form.amount),
             date: form.date || undefined,
-            method: form.method || null,
+            method: form.method || 'unknown',
             reference: form.hebrewDateText || form.reference || undefined,
             notes: form.notes || undefined,
           }),
