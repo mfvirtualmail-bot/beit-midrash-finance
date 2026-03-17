@@ -32,8 +32,6 @@ export async function ensureSeeded() {
     if (userCount === 0) {
       await supabase.from('users').insert([
         { username: 'admin', password_hash: hashPassword('admin123'), display_name: 'מנהל / Admin' },
-        { username: 'user1', password_hash: hashPassword('1234'), display_name: 'משתמש 1 / User 1' },
-        { username: 'user2', password_hash: hashPassword('1234'), display_name: 'משתמש 2 / User 2' },
       ])
     }
   } catch (e) {

@@ -39,9 +39,22 @@ export default function MemberDetailPage() {
   const [payment, setPayment] = useState({ amount: '', date: TODAY, method: '', reference: '', notes: '' })
   const [savingPayment, setSavingPayment] = useState(false)
 
+  // Payment methods from settings
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ value: string; label_he: string; label_en: string }>>([])
+  const [customMethod, setCustomMethod] = useState('')
+
   // (Generate invoice modal removed — now using dynamic statement view)
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  // Load payment methods from settings
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(data => {
+      if (Array.isArray(data?.payment_methods)) {
+        setPaymentMethods(data.payment_methods)
+      }
+    })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -74,10 +87,11 @@ export default function MemberDetailPage() {
   async function savePayment(e: React.FormEvent) {
     e.preventDefault()
     setSavingPayment(true)
+    const actualMethod = payment.method === '__custom__' ? customMethod : payment.method
     const body = {
       amount: Number(payment.amount),
       date: payment.date || undefined,
-      method: payment.method || 'unknown',
+      method: actualMethod || 'unknown',
       reference: payment.reference || null,
       notes: payment.notes || null,
     }
@@ -96,6 +110,7 @@ export default function MemberDetailPage() {
     }
     setShowPayment(false)
     setEditingPayment(null)
+    setCustomMethod('')
     setPayment({ amount: '', date: TODAY, method: '', reference: '', notes: '' })
     load()
     setSavingPayment(false)
@@ -120,8 +135,11 @@ export default function MemberDetailPage() {
 
   const methodLabel = (m: string | null) => {
     if (!m) return '—'
+    const found = paymentMethods.find(pm => pm.value === m)
+    if (found) return lang === 'he' ? found.label_he : found.label_en
+    // Legacy fallback
     if (m === 'cash') return T.cash
-    if (m === 'bank') return T.bankTransfer
+    if (m === 'bank' || m === 'bank_transfer') return T.bankTransfer
     if (m === 'check') return T.check
     if (m === 'credit_card') return lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'
     if (m === 'unknown') return T.unknown
@@ -342,14 +360,37 @@ export default function MemberDetailPage() {
               </div>
               <div>
                 <label className="label">{T.method} *</label>
-                <select className="input w-full" value={payment.method} onChange={e => setPayment(p => ({ ...p, method: e.target.value }))} required>
+                <select
+                  className="input w-full"
+                  value={payment.method === '__custom__' ? '__custom__' : payment.method}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (v === '__custom__') {
+                      setPayment(p => ({ ...p, method: '__custom__' }))
+                      setCustomMethod('')
+                    } else {
+                      setPayment(p => ({ ...p, method: v }))
+                      setCustomMethod('')
+                    }
+                  }}
+                  required={payment.method !== '__custom__'}
+                >
                   <option value="">{lang === 'he' ? '— בחר אמצעי —' : '— Select method —'}</option>
-                  <option value="cash">{T.cash}</option>
-                  <option value="bank">{T.bankTransfer}</option>
-                  <option value="check">{T.check}</option>
-                  <option value="credit_card">{lang === 'he' ? 'כרטיס אשראי' : 'Credit Card'}</option>
-                  <option value="unknown">{T.unknown}</option>
+                  {paymentMethods.map(pm => (
+                    <option key={pm.value} value={pm.value}>{lang === 'he' ? pm.label_he : pm.label_en}</option>
+                  ))}
+                  <option value="__custom__">{lang === 'he' ? 'אחר...' : 'Other...'}</option>
                 </select>
+                {payment.method === '__custom__' && (
+                  <input
+                    className="input w-full mt-2"
+                    value={customMethod}
+                    onChange={e => setCustomMethod(e.target.value)}
+                    placeholder={lang === 'he' ? 'הקלד אמצעי תשלום...' : 'Type payment method...'}
+                    required
+                    autoFocus
+                  />
+                )}
               </div>
               <div>
                 <label className="label">{T.reference}</label>
