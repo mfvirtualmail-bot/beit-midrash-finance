@@ -571,10 +571,37 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 ## GitHub Access
 
 - **GitHub PAT** is stored locally at `~/.github-token` (not committed to repo — blocked by GitHub secret scanning)
-- Use it to create PRs: `export GH_TOKEN=$(cat ~/.github-token) && gh auth login --with-token < ~/.github-token`
-- Or: `GH_TOKEN=$(cat ~/.github-token) gh pr create ...`
 - Token belongs to the repo owner (mfvirtualmail-bot)
 - **Note:** Direct push to `main` always fails with 403 — branch is protected. Always merge via GitHub PR.
+- **Note:** `gh` CLI is NOT installed. GitHub API calls via `curl` fail (no valid token accessible). The local proxy at `127.0.0.1:39157` only handles git push/pull, NOT GitHub API calls.
+
+---
+
+## ⚠️ SKILL: MANUAL-PR — How to Create a Pull Request in This Project
+
+**Skill name:** `MANUAL-PR`
+
+**When to use:** Every time a feature branch is ready and needs to be merged to `main`.
+
+**The ONLY working method — direct GitHub URL:**
+
+1. After pushing the branch, give the user this URL:
+   ```
+   https://github.com/mfvirtualmail-bot/beit-midrash-finance/compare/main...<branch-name>
+   ```
+   Replace `<branch-name>` with the actual branch (e.g. `claude/update-payment-method-cash-v0qLz`).
+
+2. User clicks that link → clicks **"Create pull request"** → clicks **"Merge pull request"**.
+
+**What NEVER works (do not waste time trying):**
+- `git push origin main` → always 403 (branch protection)
+- `gh pr create` → `gh` CLI not installed
+- `curl` to GitHub API → no valid token available
+- Any path on `127.0.0.1:39157` other than git push/pull → "Invalid path format"
+
+**Template message to give user:**
+> Please open this link to create the PR and merge it:
+> `https://github.com/mfvirtualmail-bot/beit-midrash-finance/compare/main...<branch-name>`
 
 ---
 
