@@ -24,8 +24,9 @@ interface OrgSettings {
   invoice_footer_en: string
   statement_header_html: string
   statement_footer_html: string
-  resend_api_key: string
-  email_sender: string
+  gmail_user: string
+  gmail_app_password: string
+  email_sender_name: string
 }
 
 const DEFAULTS: OrgSettings = {
@@ -40,8 +41,9 @@ const DEFAULTS: OrgSettings = {
   invoice_footer_en: '',
   statement_header_html: '',
   statement_footer_html: '',
-  resend_api_key: '',
-  email_sender: '',
+  gmail_user: '',
+  gmail_app_password: '',
+  email_sender_name: '',
 }
 
 export default function SettingsPage() {
@@ -344,37 +346,49 @@ export default function SettingsPage() {
         <div className="card space-y-4">
           <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
             <Mail size={16} className="text-purple-500" />
-            {lang === 'he' ? 'הגדרות אימייל' : 'Email Settings'}
+            {lang === 'he' ? 'הגדרות אימייל (Gmail)' : 'Email Settings (Gmail)'}
           </h2>
           <p className="text-xs text-gray-500">
             {lang === 'he'
-              ? 'הגדר את שירות Resend לשליחת דפי חשבון ואישורי תשלום באימייל לחברים.'
-              : 'Configure Resend service for sending statements and payment confirmations via email.'}
+              ? 'חבר את חשבון Gmail שלך לשליחת דפי חשבון ואישורי תשלום. יש להשתמש ב-App Password של Google.'
+              : 'Connect your Gmail account to send statements and payment confirmations. Use a Google App Password.'}
           </p>
           <div>
-            <label className="label">{lang === 'he' ? 'מפתח API של Resend' : 'Resend API Key'}</label>
-            <input
-              dir="ltr"
-              type="password"
-              className="input w-full font-mono text-sm"
-              placeholder="re_..."
-              {...f('resend_api_key')}
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              {lang === 'he' ? 'ניתן להשיג מ-resend.com' : 'Get from resend.com'}
-            </p>
-          </div>
-          <div>
-            <label className="label">{lang === 'he' ? 'כתובת שולח' : 'Sender Email Address'}</label>
+            <label className="label">{lang === 'he' ? 'כתובת Gmail' : 'Gmail Address'}</label>
             <input
               dir="ltr"
               type="email"
               className="input w-full text-sm"
-              placeholder="noreply@yourdomain.com"
-              {...f('email_sender')}
+              placeholder="yourname@gmail.com"
+              {...f('gmail_user')}
+            />
+          </div>
+          <div>
+            <label className="label">{lang === 'he' ? 'סיסמת אפליקציה של Google' : 'Google App Password'}</label>
+            <input
+              dir="ltr"
+              type="password"
+              className="input w-full font-mono text-sm"
+              placeholder="xxxx xxxx xxxx xxxx"
+              {...f('gmail_app_password')}
             />
             <p className="text-xs text-gray-400 mt-1">
-              {lang === 'he' ? 'כתובת ששולחת את המיילים. ברירת מחדל: onboarding@resend.dev' : 'Address emails are sent from. Default: onboarding@resend.dev'}
+              {lang === 'he'
+                ? 'ניתן ליצור ב: myaccount.google.com → Security → App Passwords'
+                : 'Create at: myaccount.google.com → Security → App Passwords'}
+            </p>
+          </div>
+          <div>
+            <label className="label">{lang === 'he' ? 'שם השולח' : 'Sender Display Name'}</label>
+            <input
+              dir="rtl"
+              type="text"
+              className="input w-full text-sm"
+              placeholder={lang === 'he' ? 'הנהלת בית המדרש' : 'Beit Midrash Management'}
+              {...f('email_sender_name')}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              {lang === 'he' ? 'השם שיופיע בשדה "מאת" בכל המיילים' : 'Name shown in the "From" field of all emails'}
             </p>
           </div>
         </div>

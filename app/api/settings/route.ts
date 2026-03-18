@@ -20,8 +20,9 @@ const DEFAULTS: Record<string, string> = {
   invoice_footer_en: '',
   statement_header_html: '',
   statement_footer_html: '',
-  resend_api_key: '',
-  email_sender: '',
+  gmail_user: '',
+  gmail_app_password: '',
+  email_sender_name: '',
   payment_methods: DEFAULT_PAYMENT_METHODS,
 }
 
