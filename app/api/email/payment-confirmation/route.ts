@@ -7,7 +7,7 @@ import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSo
 // Body: { member_id, payment_amount, payment_date }
 export async function POST(req: NextRequest) {
   try {
-    const { member_id, payment_amount, payment_date } = await req.json()
+    const { member_id, payment_amount, payment_date, payment_method } = await req.json()
     if (!member_id || !payment_amount) {
       return NextResponse.json({ error: 'member_id and payment_amount required' }, { status: 400 })
     }
@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
       payment_date || new Date().toISOString().split('T')[0],
       newBalance,
       last3,
+      payment_method || null,
     )
 
     return NextResponse.json({ ok: true, message: 'Payment confirmation email sent' })

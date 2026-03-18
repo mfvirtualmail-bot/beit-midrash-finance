@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 import { supabase } from './supabase'
 
 // Get email settings from DB
@@ -7,18 +7,26 @@ async function getEmailSettings() {
   const settings: Record<string, string> = {}
   for (const row of data ?? []) settings[row.key] = row.value ?? ''
   return {
-    apiKey: settings.resend_api_key || process.env.RESEND_API_KEY || 're_BiVx7nLi_2sYHeVCZt6dqMEzhuJn3hoMm',
-    senderEmail: settings.email_sender || 'onboarding@resend.dev',
-    senderName: settings.org_name_he || 'בית המדרש',
+    gmailUser: settings.gmail_user || process.env.GMAIL_USER || '',
+    gmailAppPassword: settings.gmail_app_password || process.env.GMAIL_APP_PASSWORD || '',
+    senderName: settings.email_sender_name || settings.org_name_he || 'בית המדרש',
     orgName: settings.org_name_he || 'בית המדרש',
     orgPhone: settings.org_phone || '',
     orgEmail: settings.org_email || '',
   }
 }
 
-function getResendClient(apiKey: string) {
-  if (!apiKey) throw new Error('Resend API key not configured')
-  return new Resend(apiKey)
+function createTransport(gmailUser: string, gmailAppPassword: string) {
+  if (!gmailUser || !gmailAppPassword) throw new Error('Gmail credentials not configured. Please set Gmail User and App Password in Settings.')
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: gmailUser,
+      pass: gmailAppPassword,
+    },
+  })
 }
 
 // Format currency
@@ -66,9 +74,13 @@ export async function sendStatementEmail(
   pdfFileName: string,
 ) {
   const emailSettings = await getEmailSettings()
-  const resend = getResendClient(emailSettings.apiKey)
+  const transporter = createTransport(emailSettings.gmailUser, emailSettings.gmailAppPassword)
 
   const recentTable = buildRecentActivityTable(lines)
+  const balanceFormatted = balance > 0 ? fmt(balance) : balance < 0 ? `זיכוי ${fmt(balance)}` : '€0.00'
+  const balanceColor = balance > 0 ? '#1e40af' : '#16a34a'
+  const balanceBg = balance > 0 ? '#eff6ff' : '#f0fdf4'
+  const balanceBorder = balance > 0 ? '#bfdbfe' : '#bbf7d0'
 
   const html = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -78,13 +90,13 @@ export async function sendStatementEmail(
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%);color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;">
       <h1 style="margin:0;font-size:22px;font-weight:800;">${emailSettings.orgName}</h1>
-      <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">דף חשבון</p>
+      <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">דף חשבון מעודכן</p>
     </div>
 
     <!-- Body -->
     <div style="background:white;padding:24px;border:1px solid #e2e8f0;border-top:none;">
-      <p style="font-size:15px;color:#1e293b;margin:0 0 20px;">שלום <strong>${memberName}</strong>,</p>
-      <p style="font-size:14px;color:#475569;margin:0 0 20px;">מצורף בזאת דף החשבון שלך. להלן סיכום:</p>
+      <p style="font-size:15px;color:#1e293b;margin:0 0 12px;">שלום <strong>${memberName}</strong>,</p>
+      <p style="font-size:14px;color:#475569;margin:0 0 20px;">מצורף דף החשבון שלך. יתרה נוכחית: <strong>${balanceFormatted}</strong>.</p>
 
       <!-- Summary cards -->
       <div style="display:flex;gap:12px;margin-bottom:20px;">
@@ -96,9 +108,9 @@ export async function sendStatementEmail(
           <div style="font-size:11px;color:#16a34a;font-weight:600;">סה"כ תשלומים</div>
           <div style="font-size:18px;font-weight:800;color:#16a34a;margin-top:4px;">${fmt(totalPaid)}</div>
         </div>
-        <div style="flex:1;background:${balance > 0 ? '#eff6ff' : '#f0fdf4'};border:1px solid ${balance > 0 ? '#bfdbfe' : '#bbf7d0'};border-radius:8px;padding:12px;text-align:center;">
-          <div style="font-size:11px;color:${balance > 0 ? '#1e40af' : '#16a34a'};font-weight:600;">יתרה</div>
-          <div style="font-size:18px;font-weight:800;color:${balance > 0 ? '#1e40af' : '#16a34a'};margin-top:4px;">${balance > 0 ? fmt(balance) : balance < 0 ? `זיכוי ${fmt(balance)}` : '€0.00'}</div>
+        <div style="flex:1;background:${balanceBg};border:1px solid ${balanceBorder};border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:${balanceColor};font-weight:600;">יתרה</div>
+          <div style="font-size:18px;font-weight:800;color:${balanceColor};margin-top:4px;">${balanceFormatted}</div>
         </div>
       </div>
 
@@ -120,10 +132,10 @@ export async function sendStatementEmail(
 </body>
 </html>`
 
-  const { data, error } = await resend.emails.send({
-    from: `${emailSettings.senderName} <${emailSettings.senderEmail}>`,
-    to: [memberEmail],
-    subject: `דף חשבון - ${emailSettings.orgName}`,
+  await transporter.sendMail({
+    from: `"${emailSettings.senderName}" <${emailSettings.gmailUser}>`,
+    to: memberEmail,
+    subject: `דף חשבון מעודכן - ${memberName}`,
     html,
     attachments: [
       {
@@ -133,12 +145,17 @@ export async function sendStatementEmail(
       },
     ],
   })
-
-  if (error) throw new Error(error.message)
-  return data
 }
 
 // ==================== PAYMENT CONFIRMATION EMAIL ====================
+
+const METHOD_LABELS_HE: Record<string, string> = {
+  cash: 'מזומן',
+  bank: 'העברה בנקאית',
+  bank_transfer: 'העברה בנקאית',
+  check: "צ'ק",
+  credit_card: 'כרטיס אשראי',
+}
 
 export async function sendPaymentConfirmationEmail(
   memberEmail: string,
@@ -147,11 +164,23 @@ export async function sendPaymentConfirmationEmail(
   paymentDate: string,
   newBalance: number,
   recentLines: Array<{ date: string; period: string; description: string; charge: number; payment: number }>,
+  paymentMethod?: string | null,
 ) {
   const emailSettings = await getEmailSettings()
-  const resend = getResendClient(emailSettings.apiKey)
+  const transporter = createTransport(emailSettings.gmailUser, emailSettings.gmailAppPassword)
 
   const recentTable = buildRecentActivityTable(recentLines)
+  const balanceColor = newBalance > 0 ? '#1e40af' : '#16a34a'
+  const balanceFormatted = newBalance > 0 ? fmt(newBalance) : newBalance < 0 ? `זיכוי ${fmt(newBalance)}` : '€0.00'
+
+  // Only mention method if it's a known, meaningful value
+  const methodLabel = paymentMethod && paymentMethod !== 'unknown' ? (METHOD_LABELS_HE[paymentMethod] || null) : null
+  const methodRow = methodLabel
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:13px;color:#475569;">אמצעי תשלום</span>
+        <span style="font-size:14px;font-weight:600;color:#1e293b;">${methodLabel}</span>
+       </div>`
+    : ''
 
   const html = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -179,9 +208,10 @@ export async function sendPaymentConfirmationEmail(
           <span style="font-size:13px;color:#475569;">תאריך</span>
           <span style="font-size:14px;font-weight:600;color:#1e293b;">${paymentDate}</span>
         </div>
+        ${methodRow}
         <div style="border-top:1px solid #bbf7d0;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:13px;color:${newBalance > 0 ? '#1e40af' : '#16a34a'};font-weight:600;">יתרה מעודכנת</span>
-          <span style="font-size:18px;font-weight:800;color:${newBalance > 0 ? '#1e40af' : '#16a34a'};">${newBalance > 0 ? fmt(newBalance) : newBalance < 0 ? `זיכוי ${fmt(newBalance)}` : '€0.00'}</span>
+          <span style="font-size:13px;color:${balanceColor};font-weight:600;">יתרה מעודכנת</span>
+          <span style="font-size:18px;font-weight:800;color:${balanceColor};">${balanceFormatted}</span>
         </div>
       </div>
 
@@ -201,13 +231,10 @@ export async function sendPaymentConfirmationEmail(
 </body>
 </html>`
 
-  const { data, error } = await resend.emails.send({
-    from: `${emailSettings.senderName} <${emailSettings.senderEmail}>`,
-    to: [memberEmail],
+  await transporter.sendMail({
+    from: `"${emailSettings.senderName}" <${emailSettings.gmailUser}>`,
+    to: memberEmail,
     subject: `אישור תשלום - ${emailSettings.orgName}`,
     html,
   })
-
-  if (error) throw new Error(error.message)
-  return data
 }
