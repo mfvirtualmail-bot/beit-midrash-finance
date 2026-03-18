@@ -258,6 +258,9 @@ export const translations = {
     sendPaymentConfirmation: 'שלח אישור תשלום באימייל?',
     emailSettings: 'הגדרות אימייל',
     noMemberEmail: 'לחבר אין כתובת אימייל',
+    // Clients
+    clients: 'לקוחות',
+    clientsDesc: 'חברים, תורמים ומבצעי רכישות',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -516,6 +519,9 @@ export const translations = {
     sendPaymentConfirmation: 'Send payment confirmation email?',
     emailSettings: 'Email Settings',
     noMemberEmail: 'Member has no email address',
+    // Clients
+    clients: 'Clients',
+    clientsDesc: 'Members, donors & purchasers',
   }
 }
 
