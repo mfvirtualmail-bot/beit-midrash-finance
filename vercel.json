@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "app/api/statements/pdf/route.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "app/api/email/send-statement/route.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
+}

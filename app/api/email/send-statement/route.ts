@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { sendStatementEmail } from '@/lib/email'
 import { buildMemberStatementData, generateStatementHtml, loadOrgSettings } from '@/lib/statementPdf'
+import { htmlToPdf } from '@/lib/htmlToPdf'
 
 // POST /api/email/send-statement
 // Content-Type: multipart/form-data
@@ -36,18 +37,18 @@ export async function POST(req: NextRequest) {
 
     const { lines, totalCharged, totalPaid, balance } = statementData
 
-    // Prepare PDF attachment
+    // Prepare PDF attachment — generate real PDF from HTML using headless Chromium
     let pdfBuffer: Buffer
-    const pdfFileName = `דף_חשבון_${member.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`
+    const pdfFileName = `דף_חשבון_${member.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
 
     if (pdfFile) {
       // Client sent a generated PDF
       pdfBuffer = Buffer.from(await pdfFile.arrayBuffer())
     } else {
-      // Generate HTML statement directly (no HTTP self-fetch)
+      // Generate HTML, then convert to real PDF via headless Chromium
       const orgSettings = await loadOrgSettings()
       const htmlContent = generateStatementHtml([statementData], orgSettings)
-      pdfBuffer = Buffer.from(htmlContent, 'utf-8')
+      pdfBuffer = await htmlToPdf(htmlContent)
     }
 
     await sendStatementEmail(
@@ -67,3 +68,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
+
+// Vercel function config — Chromium needs more memory and time
+export const maxDuration = 30
+export const dynamic = 'force-dynamic'
