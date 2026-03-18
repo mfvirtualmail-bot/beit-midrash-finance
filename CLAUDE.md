@@ -512,12 +512,69 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 
 ---
 
+---
+
+### Session 11 — 2026-03-18
+
+**Branch:** `claude/update-payment-method-cash-v0qLz`
+
+**What was done:**
+
+1. **Payment method 'cash' → 'unknown'** — All previously imported payments were falsely marked as `cash` because the DB column had `DEFAULT 'cash'`. Fixed across all layers:
+   - `supabase-schema.sql` — column default changed: `method text default 'unknown'`
+   - `app/api/admin/migrate/route.ts` — added **v9 migration**:
+     ```sql
+     ALTER TABLE member_payments ALTER COLUMN method SET DEFAULT 'unknown';
+     UPDATE member_payments SET method = 'unknown' WHERE method = 'cash';
+     ```
+   - Note: v7 (cash→NULL) and v8 (NULL/cash→unknown) were already present from session 10. v9 is the final cleanup + default change.
+
+2. **Replace Resend with Gmail SMTP** — Full email system rewrite using Nodemailer:
+   - `lib/email.ts` — replaced `Resend` client with `nodemailer.createTransport()` using `smtp.gmail.com:465` (SSL)
+   - Credentials pulled from settings DB: `gmail_user`, `gmail_app_password`, `email_sender_name`
+   - Fallback to env vars: `GMAIL_USER`, `GMAIL_APP_PASSWORD`
+   - Statement email subject: `דף חשבון מעודכן - [Member Name]`
+   - Statement body opening: `שלום [Name], מצורף דף החשבון שלך. יתרה נוכחית: [Balance].`
+   - Payment confirmation: method shown only if known (not blank/unknown)
+   - `package.json` — removed `resend@^6.9.4`, added `nodemailer@^6.9.16` + `@types/nodemailer`
+
+3. **Gmail Settings UI** — Settings page (`app/settings/page.tsx`) updated:
+   - Removed: Resend API Key field, Sender Email field
+   - Added: Gmail Address field (`gmail_user`), Google App Password field (`gmail_app_password`, masked), Sender Display Name field (`email_sender_name`)
+   - Helper text: "Create App Password at myaccount.google.com → Security → App Passwords"
+
+4. **Settings API** — `app/api/settings/route.ts` DEFAULTS updated:
+   - Removed: `resend_api_key`, `email_sender`
+   - Added: `gmail_user`, `gmail_app_password`, `email_sender_name`
+
+5. **Payment confirmation passes method** — `app/api/email/payment-confirmation/route.ts` now accepts and forwards `payment_method` from request body to `sendPaymentConfirmationEmail()`.
+
+**Files changed:**
+- `lib/email.ts` — full rewrite: Nodemailer Gmail SMTP
+- `app/api/settings/route.ts` — replaced resend keys with gmail keys
+- `app/settings/page.tsx` — Gmail SMTP settings UI (3 new fields)
+- `app/api/email/payment-confirmation/route.ts` — passes payment_method
+- `app/api/admin/migrate/route.ts` — v9 migration
+- `supabase-schema.sql` — column default 'unknown'
+- `package.json` / `package-lock.json` — resend removed, nodemailer added
+
+**AFTER DEPLOY:**
+1. Run `POST /api/admin/migrate` — applies v9 (all 'cash' → 'unknown', default changed)
+2. Go to Settings → Email Settings → enter Gmail address + App Password + Sender Name
+
+**Known deployment note:** Direct push to `main` is blocked (403). User must merge PR manually on GitHub. The local `main` branch has all changes merged but remote `main` requires manual PR merge via GitHub UI.
+
+**Git state:** On branch `claude/update-payment-method-cash-v0qLz`, pushed to origin. Awaiting manual PR merge to main.
+
+---
+
 ## GitHub Access
 
 - **GitHub PAT** is stored locally at `~/.github-token` (not committed to repo — blocked by GitHub secret scanning)
 - Use it to create PRs: `export GH_TOKEN=$(cat ~/.github-token) && gh auth login --with-token < ~/.github-token`
 - Or: `GH_TOKEN=$(cat ~/.github-token) gh pr create ...`
 - Token belongs to the repo owner (mfvirtualmail-bot)
+- **Note:** Direct push to `main` always fails with 403 — branch is protected. Always merge via GitHub PR.
 
 ---
 
