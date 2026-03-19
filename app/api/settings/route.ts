@@ -24,6 +24,8 @@ const DEFAULTS: Record<string, string> = {
   gmail_app_password: '',
   email_sender_name: '',
   payment_methods: DEFAULT_PAYMENT_METHODS,
+  stripe_secret_key: '',
+  stripe_webhook_secret: '',
 }
 
 // Keys that should be stored/returned as raw JSON (not stringified again)

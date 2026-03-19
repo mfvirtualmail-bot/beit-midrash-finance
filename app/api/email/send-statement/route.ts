@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { sendStatementEmail } from '@/lib/email'
 import { buildMemberStatementData, generateStatementHtml, loadOrgSettings } from '@/lib/statementPdf'
 import { htmlToPdf } from '@/lib/htmlToPdf'
+import Stripe from 'stripe'
 
 // POST /api/email/send-statement
 // Content-Type: multipart/form-data
@@ -51,6 +52,53 @@ export async function POST(req: NextRequest) {
       pdfBuffer = await htmlToPdf(htmlContent)
     }
 
+    // Optionally generate a Stripe payment link if balance > 0 and Stripe is configured
+    let paymentLink: string | null = null
+    if (balance > 0) {
+      try {
+        const { data: settingsRows } = await supabase.from('settings').select('key, value')
+        const settings: Record<string, string> = {}
+        for (const row of settingsRows ?? []) settings[row.key] = row.value ?? ''
+
+        const stripeSecretKey = settings.stripe_secret_key || process.env.STRIPE_SECRET_KEY || ''
+        if (stripeSecretKey) {
+          const stripe = new Stripe(stripeSecretKey)
+          const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://localhost:3000'
+          const orgName = settings.org_name_he || 'בית המדרש'
+
+          const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            payment_method_types: ['card'],
+            line_items: [
+              {
+                price_data: {
+                  currency: 'eur',
+                  product_data: {
+                    name: `תשלום יתרה - ${member.name}`,
+                    description: orgName,
+                  },
+                  unit_amount: Math.round(balance * 100),
+                },
+                quantity: 1,
+              },
+            ],
+            customer_email: member.email || undefined,
+            metadata: {
+              member_id: String(member.id),
+              member_name: member.name,
+              org_name: orgName,
+            },
+            success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&member_id=${member.id}`,
+            cancel_url: `${origin}/members/${member.id}`,
+          })
+          paymentLink = session.url
+        }
+      } catch (stripeErr) {
+        // Non-fatal: send email without payment link if Stripe fails
+        console.error('Stripe payment link generation failed:', stripeErr)
+      }
+    }
+
     await sendStatementEmail(
       member.email,
       member.name,
@@ -60,9 +108,10 @@ export async function POST(req: NextRequest) {
       lines,
       pdfBuffer,
       pdfFileName,
+      paymentLink,
     )
 
-    return NextResponse.json({ ok: true, message: 'Email sent successfully' })
+    return NextResponse.json({ ok: true, message: 'Email sent successfully', paymentLink })
   } catch (e) {
     console.error('Send statement email error:', e)
     return NextResponse.json({ error: String(e) }, { status: 500 })

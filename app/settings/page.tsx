@@ -27,6 +27,8 @@ interface OrgSettings {
   gmail_user: string
   gmail_app_password: string
   email_sender_name: string
+  stripe_secret_key: string
+  stripe_webhook_secret: string
 }
 
 const DEFAULTS: OrgSettings = {
@@ -44,6 +46,8 @@ const DEFAULTS: OrgSettings = {
   gmail_user: '',
   gmail_app_password: '',
   email_sender_name: '',
+  stripe_secret_key: '',
+  stripe_webhook_secret: '',
 }
 
 export default function SettingsPage() {
@@ -389,6 +393,49 @@ export default function SettingsPage() {
             />
             <p className="text-xs text-gray-400 mt-1">
               {lang === 'he' ? 'השם שיופיע בשדה "מאת" בכל המיילים' : 'Name shown in the "From" field of all emails'}
+            </p>
+          </div>
+        </div>
+
+        {/* Stripe Payment Settings */}
+        <div className="card space-y-4">
+          <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+            <CreditCard size={16} className="text-violet-500" />
+            {lang === 'he' ? 'הגדרות תשלום Stripe' : 'Stripe Payment Settings'}
+          </h2>
+          <p className="text-xs text-gray-500">
+            {lang === 'he'
+              ? 'חבר את חשבון Stripe שלך כדי לשלוח קישורי תשלום מובנים בתוך דפי החשבון. החברים יוכלו לשלם בקליק אחד.'
+              : 'Connect your Stripe account to embed payment links inside statement emails. Members can pay with one click.'}
+          </p>
+          <div>
+            <label className="label">{lang === 'he' ? 'Stripe Secret Key' : 'Stripe Secret Key'}</label>
+            <input
+              dir="ltr"
+              type="password"
+              className="input w-full font-mono text-sm"
+              placeholder="sk_live_... or sk_test_..."
+              {...f('stripe_secret_key')}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              {lang === 'he'
+                ? 'מפתח סודי מ-dashboard.stripe.com → Developers → API Keys'
+                : 'Secret key from dashboard.stripe.com → Developers → API Keys'}
+            </p>
+          </div>
+          <div>
+            <label className="label">{lang === 'he' ? 'Stripe Webhook Secret' : 'Stripe Webhook Secret'}</label>
+            <input
+              dir="ltr"
+              type="password"
+              className="input w-full font-mono text-sm"
+              placeholder="whsec_..."
+              {...f('stripe_webhook_secret')}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              {lang === 'he'
+                ? `צור Webhook ב-Stripe Dashboard → Developers → Webhooks → Add endpoint. URL: https://[your-domain]/api/stripe/webhook`
+                : `Create a Webhook in Stripe Dashboard → Developers → Webhooks → Add endpoint. URL: https://[your-domain]/api/stripe/webhook`}
             </p>
           </div>
         </div>
