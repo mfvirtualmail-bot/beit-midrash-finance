@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
       income: number
     }> = {}
 
-    function ensureMonth(m: string) {
+    const ensureMonth = (m: string) => {
       if (!monthMap[m]) monthMap[m] = { month: m, charged: 0, collected: 0, other_income: 0, expense: 0, income: 0 }
     }
 
