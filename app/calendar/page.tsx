@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { HDate, HebrewCalendar, months, flags } from '@hebcal/core'
 import type { CalOptions } from '@hebcal/core'
-import { MONTH_HE, MONTH_EN, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getShabbatOrHolidayLabel, stripNikud } from '@/lib/hebrewDate'
+import { getMonthNameHe, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getShabbatOrHolidayLabel, stripNikud } from '@/lib/hebrewDate'
 import { Calendar as CalIcon, ChevronLeft, ChevronRight, ShoppingCart, Star, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 
@@ -177,7 +177,7 @@ function getUpcomingHolidays(count: number): HolidayEvent[] {
           name: stripNikud(ev.render?.('he') ?? ''),
           nameEn: stripNikud(ev.render?.('en') ?? ''),
           date: hd.greg(),
-          hebrewDate: `${HEBREW_DIGITS[hd.getDate()] ?? hd.getDate()} ${MONTH_HE[hd.getMonth()] ?? ''}`,
+          hebrewDate: `${HEBREW_DIGITS[hd.getDate()] ?? hd.getDate()} ${getMonthNameHe(hd.getMonth(), hd.getFullYear())}`,
           isChag,
           isMajor: isChag || isMajorFast,
         })

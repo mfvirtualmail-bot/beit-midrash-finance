@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
 import { Category, Member } from '@/lib/db'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE, MONTH_EN, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange } from '@/lib/hebrewDate'
+import { getMonthNameHe, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange } from '@/lib/hebrewDate'
 import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Settings, Edit2, Calendar, Upload, Pencil, X } from 'lucide-react'
 import Link from 'next/link'
 
@@ -47,9 +47,9 @@ function getWeeksForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 
     const hdSun = new HDate(sunday)
     const hdSat = new HDate(saturday)
     const hebrewSunDay = hdSun.getDate()
-    const hebrewSunMonth = MONTH_HE[hdSun.getMonth()] ?? ''
+    const hebrewSunMonth = getMonthNameHe(hdSun.getMonth(), hdSun.getFullYear())
     const hebrewSatDay = hdSat.getDate()
-    const hebrewSatMonth = MONTH_HE[hdSat.getMonth()] ?? ''
+    const hebrewSatMonth = getMonthNameHe(hdSat.getMonth(), hdSat.getFullYear())
     const sameMonth = hdSun.getMonth() === hdSat.getMonth()
     const hebrewLabel = sameMonth
       ? `${hebrewSunDay}–${hebrewSatDay} ${hebrewSunMonth}`

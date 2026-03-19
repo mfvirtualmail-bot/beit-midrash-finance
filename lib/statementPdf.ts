@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from './hebrewDate'
+import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from './hebrewDate'
 
 export interface StatementMemberData {
   member: { id: number; name: string; phone?: string; email?: string; address?: string }
@@ -66,7 +66,7 @@ export async function buildMemberStatementData(
     } else {
       try {
         const hd = toHDate(c.date)
-        period = `${MONTH_HE[hd.getMonth()] ?? ''} ${yearToGematriya(hd.getFullYear())}`
+        period = `${getMonthNameHe(hd.getMonth(), hd.getFullYear())} ${yearToGematriya(hd.getFullYear())}`
       } catch {
         period = formatHebrewDate(c.date, 'he')
       }

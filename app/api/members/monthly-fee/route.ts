@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE, hebrewYearStr, getHebrewMonthsInYear } from '@/lib/hebrewDate'
+import { getMonthNameHe, hebrewYearStr, getHebrewMonthsInYear } from '@/lib/hebrewDate'
 
 function getMonthInfo(monthNum: number, yearNum: number) {
-  const monthHe = MONTH_HE[monthNum] ?? ''
+  const monthHe = getMonthNameHe(monthNum, yearNum)
   const hd = new HDate(1, monthNum, yearNum)
   const yearHe = hebrewYearStr(hd)
   const feeDesc = `דמי חבר - ${monthHe} ${yearHe}`

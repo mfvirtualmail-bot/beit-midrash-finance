@@ -55,6 +55,25 @@ const MONTH_EN: Record<number, string> = {
   [months.ELUL]: 'Elul',
 }
 
+/**
+ * Get the correct Hebrew month name, taking leap years into account.
+ * In a non-leap year, ADAR_I is just "אדר" (not "אדר א׳").
+ * In a leap year, ADAR_I = "אדר א׳", ADAR_II = "אדר ב׳".
+ */
+export function getMonthNameHe(monthNum: number, hebrewYear: number): string {
+  if (monthNum === months.ADAR_I && !HDate.isLeapYear(hebrewYear)) {
+    return 'אדר'
+  }
+  return MONTH_HE[monthNum] ?? ''
+}
+
+export function getMonthNameEn(monthNum: number, hebrewYear: number): string {
+  if (monthNum === months.ADAR_I && !HDate.isLeapYear(hebrewYear)) {
+    return 'Adar'
+  }
+  return MONTH_EN[monthNum] ?? ''
+}
+
 const HEBREW_DIGITS: Record<number, string> = {
   1:'א', 2:'ב', 3:'ג', 4:'ד', 5:'ה', 6:'ו', 7:'ז', 8:'ח', 9:'ט',
   10:'י', 11:'יא', 12:'יב', 13:'יג', 14:'יד', 15:'טו', 16:'טז',
@@ -117,11 +136,12 @@ export function formatHebrewDate(gregorianDateStr: string, lang: 'he' | 'en' = '
     const hd = toHDate(gregorianDateStr)
     const day = HEBREW_DIGITS[hd.getDate()] ?? String(hd.getDate())
     const monthNum = hd.getMonth()
-    const yearStr = yearToGematriya(hd.getFullYear())
+    const hebrewYear = hd.getFullYear()
+    const yearStr = yearToGematriya(hebrewYear)
     if (lang === 'he') {
-      return `${day} ${MONTH_HE[monthNum] ?? ''} ${yearStr}`
+      return `${day} ${getMonthNameHe(monthNum, hebrewYear)} ${yearStr}`
     }
-    return `${hd.getDate()} ${MONTH_EN[monthNum] ?? ''} ${hd.getFullYear()}`
+    return `${hd.getDate()} ${getMonthNameEn(monthNum, hebrewYear)} ${hebrewYear}`
   } catch {
     return gregorianDateStr
   }
@@ -135,11 +155,12 @@ export function getCurrentHebrewYear(): number {
 // Get Hebrew month and year for a given gregorian YYYY-MM string
 export function getHebrewMonthYear(gregorianDateStr: string): { month: number; year: number; monthHe: string; monthEn: string } {
   const hd = toHDate(gregorianDateStr + '-01')
+  const hebrewYear = hd.getFullYear()
   return {
     month: hd.getMonth(),
-    year: hd.getFullYear(),
-    monthHe: MONTH_HE[hd.getMonth()] ?? '',
-    monthEn: MONTH_EN[hd.getMonth()] ?? '',
+    year: hebrewYear,
+    monthHe: getMonthNameHe(hd.getMonth(), hebrewYear),
+    monthEn: getMonthNameEn(hd.getMonth(), hebrewYear),
   }
 }
 
@@ -148,11 +169,12 @@ export function getHebrewMonthsInYear(hebrewYear: number): Array<{ month: number
   const isLeap = HDate.isLeapYear(hebrewYear)
   return MONTH_ORDER
     .filter(m => {
-      if (m === months.ADAR_I) return isLeap
+      // In non-leap year: include ADAR_I (as plain Adar), exclude ADAR_II
+      // In leap year: include both ADAR_I and ADAR_II
       if (m === months.ADAR_II) return isLeap
       return true
     })
-    .map(m => ({ month: m, nameHe: MONTH_HE[m] ?? '', nameEn: MONTH_EN[m] ?? '' }))
+    .map(m => ({ month: m, nameHe: getMonthNameHe(m, hebrewYear), nameEn: getMonthNameEn(m, hebrewYear) }))
 }
 
 // Get the Gregorian date range for a Hebrew month/year
@@ -393,7 +415,7 @@ export function getPaymentSortIndex(gregorianDate: string): number {
   try {
     const hd = toHDate(gregorianDate)
     const monthNum = hd.getMonth()
-    const monthName = MONTH_HE[monthNum]
+    const monthName = getMonthNameHe(monthNum, hd.getFullYear())
     if (!monthName) return 9999
 
     // Find the last item index for this month
