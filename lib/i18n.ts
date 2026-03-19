@@ -262,7 +262,6 @@ export const translations = {
     clients: 'לקוחות',
     clientsDesc: 'חברים, תורמים ומבצעי רכישות',
     // Financial breakdown
-    totalCollected: 'נגבה',
     totalOutstanding: 'יתרת חוב',
     otherIncome: 'הכנסות אחרות',
     actualIncome: 'הכנסה בפועל',
@@ -532,7 +531,6 @@ export const translations = {
     clients: 'Clients',
     clientsDesc: 'Members, donors & purchasers',
     // Financial breakdown
-    totalCollected: 'Collected',
     totalOutstanding: 'Outstanding',
     otherIncome: 'Other Income',
     actualIncome: 'Actual Income',
