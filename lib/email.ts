@@ -72,6 +72,7 @@ export async function sendStatementEmail(
   lines: Array<{ date: string; period: string; description: string; charge: number; payment: number }>,
   pdfBuffer: Buffer,
   pdfFileName: string,
+  paymentLink?: string | null,
 ) {
   const emailSettings = await getEmailSettings()
   const transporter = createTransport(emailSettings.gmailUser, emailSettings.gmailAppPassword)
@@ -121,6 +122,17 @@ export async function sendStatementEmail(
       ` : ''}
 
       <p style="font-size:13px;color:#64748b;margin:20px 0 0;">הדף המלא מצורף כקובץ PDF.</p>
+
+      ${paymentLink && balance > 0 ? `
+      <!-- Pay Now button -->
+      <div style="margin-top:24px;text-align:center;">
+        <a href="${paymentLink}"
+           style="display:inline-block;background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%);color:white;font-size:16px;font-weight:700;padding:14px 36px;border-radius:12px;text-decoration:none;letter-spacing:0.5px;">
+          💳 שלם עכשיו — ${fmt(balance)}
+        </a>
+        <p style="font-size:11px;color:#94a3b8;margin:8px 0 0;">תשלום מאובטח דרך Stripe</p>
+      </div>
+      ` : ''}
     </div>
 
     <!-- Footer -->

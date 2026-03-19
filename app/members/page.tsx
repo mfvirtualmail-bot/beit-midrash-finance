@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle, FileText } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle, FileText, CreditCard, Copy, ExternalLink } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
 import Link from 'next/link'
 
@@ -52,6 +52,53 @@ export default function MembersPage() {
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
+
+  // Payment link state
+  const [paymentLinkMember, setPaymentLinkMember] = useState<Member | null>(null)
+  const [paymentLinkAmount, setPaymentLinkAmount] = useState('')
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null)
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState(false)
+  const [paymentLinkCopied, setPaymentLinkCopied] = useState(false)
+
+  function openPaymentLink(m: Member) {
+    setPaymentLinkMember(m)
+    setPaymentLinkAmount(m.balance > 0 ? String(m.balance.toFixed(2)) : '')
+    setPaymentLinkUrl(null)
+    setPaymentLinkCopied(false)
+  }
+
+  async function generatePaymentLink() {
+    if (!paymentLinkMember || !paymentLinkAmount) return
+    setPaymentLinkLoading(true)
+    setPaymentLinkUrl(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: paymentLinkMember.id,
+          amount: parseFloat(paymentLinkAmount),
+          description: `תשלום - ${paymentLinkMember.name}`,
+        }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        setPaymentLinkUrl(data.url)
+      } else {
+        alert(data.error || 'Failed to generate payment link')
+      }
+    } catch {
+      alert('Network error')
+    }
+    setPaymentLinkLoading(false)
+  }
+
+  async function copyPaymentLink() {
+    if (!paymentLinkUrl) return
+    await navigator.clipboard.writeText(paymentLinkUrl)
+    setPaymentLinkCopied(true)
+    setTimeout(() => setPaymentLinkCopied(false), 2000)
+  }
 
   function toggleSelect(id: number) {
     setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
@@ -280,6 +327,9 @@ export default function MembersPage() {
                       <button onClick={() => router.push(`/members/${m.id}#invoice`)} className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg" title={lang === 'he' ? 'הפק דף חשבון' : 'Generate Statement'}>
                         <FileText size={15} />
                       </button>
+                      <button onClick={() => openPaymentLink(m)} className="p-1.5 hover:bg-violet-100 text-violet-600 rounded-lg" title={lang === 'he' ? 'שלח קישור תשלום' : 'Send Payment Link'}>
+                        <CreditCard size={15} />
+                      </button>
                       <button onClick={() => openEdit(m)} className="p-1.5 hover:bg-gray-100 text-gray-500 rounded-lg">
                         <Edit2 size={15} />
                       </button>
@@ -446,6 +496,107 @@ export default function MembersPage() {
               <button onClick={() => handleDelete(deleteId)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex-1">{T.delete}</button>
               <button onClick={() => setDeleteId(null)} className="btn-secondary flex-1">{T.cancel}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Link Modal */}
+      {paymentLinkMember && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md space-y-4">
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
+                <CreditCard size={20} className="text-violet-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-800">
+                  {lang === 'he' ? 'קישור תשלום Stripe' : 'Stripe Payment Link'}
+                </h2>
+                <p className="text-xs text-gray-500">{paymentLinkMember.name}</p>
+              </div>
+            </div>
+
+            {!paymentLinkUrl ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="label">{lang === 'he' ? 'סכום לתשלום (€)' : 'Amount to Pay (€)'}</label>
+                  <input
+                    dir="ltr"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    className="input w-full text-lg font-bold"
+                    value={paymentLinkAmount}
+                    onChange={e => setPaymentLinkAmount(e.target.value)}
+                    placeholder="0.00"
+                  />
+                  {paymentLinkMember.balance > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {lang === 'he' ? `יתרת חוב: €${paymentLinkMember.balance.toFixed(2)}` : `Outstanding balance: €${paymentLinkMember.balance.toFixed(2)}`}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={generatePaymentLink}
+                    disabled={paymentLinkLoading || !paymentLinkAmount}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  >
+                    <CreditCard size={15} />
+                    {paymentLinkLoading
+                      ? (lang === 'he' ? 'יוצר קישור...' : 'Creating link...')
+                      : (lang === 'he' ? 'צור קישור תשלום' : 'Generate Payment Link')}
+                  </button>
+                  <button onClick={() => setPaymentLinkMember(null)} className="btn-secondary">{T.cancel}</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+                  <p className="text-xs text-violet-600 font-semibold mb-2">
+                    {lang === 'he' ? 'קישור התשלום מוכן:' : 'Payment link ready:'}
+                  </p>
+                  <p className="text-xs text-gray-600 break-all font-mono bg-white border border-gray-200 rounded-lg p-2">
+                    {paymentLinkUrl}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={copyPaymentLink}
+                    className="flex items-center justify-center gap-2 text-sm px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium"
+                  >
+                    {paymentLinkCopied ? <CheckCircle size={15} className="text-green-600" /> : <Copy size={15} />}
+                    {paymentLinkCopied ? (lang === 'he' ? 'הועתק!' : 'Copied!') : (lang === 'he' ? 'העתק' : 'Copy')}
+                  </button>
+                  <a
+                    href={paymentLinkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 text-sm px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-medium"
+                  >
+                    <ExternalLink size={15} />
+                    {lang === 'he' ? 'פתח' : 'Open'}
+                  </a>
+                </div>
+
+                {paymentLinkMember.email && (
+                  <p className="text-xs text-gray-400 text-center">
+                    {lang === 'he'
+                      ? `שלח את הקישור בדוא"ל ל: ${paymentLinkMember.email}`
+                      : `Send this link by email to: ${paymentLinkMember.email}`}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => { setPaymentLinkUrl(null); setPaymentLinkAmount('') }}
+                  className="w-full text-sm text-gray-500 hover:text-gray-700 py-1"
+                >
+                  {lang === 'he' ? 'צור קישור חדש' : 'Generate new link'}
+                </button>
+                <button onClick={() => setPaymentLinkMember(null)} className="btn-secondary w-full">{T.cancel}</button>
+              </div>
+            )}
           </div>
         </div>
       )}
