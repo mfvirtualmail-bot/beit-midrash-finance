@@ -41,6 +41,15 @@ UPDATE member_payments SET method = 'unknown' WHERE method IS NULL OR method = '
 -- v9: Change default from 'cash' to 'unknown' and clean up any remaining 'cash' entries
 ALTER TABLE member_payments ALTER COLUMN method SET DEFAULT 'unknown';
 UPDATE member_payments SET method = 'unknown' WHERE method = 'cash';
+
+-- v10: Fix purchases stored as 'expense' → should be 'purchase'
+-- Purchases are transactions with member_id set, or with a purchase-type category
+UPDATE transactions SET type = 'purchase'
+WHERE type = 'expense'
+  AND (
+    member_id IS NOT NULL
+    OR category_id IN (SELECT id FROM categories WHERE type = 'purchase')
+  );
 `
 
 export async function POST() {

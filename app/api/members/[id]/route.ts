@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const { data: purchases } = await supabase.from('transactions')
       .select('*, categories(name_he, name_en)')
       .eq('member_id', params.id)
-      .in('type', ['expense', 'purchase'])
+      .eq('type', 'purchase')
       .order('date', { ascending: false })
 
     const tc = (charges ?? []).reduce((s, c) => s + Number(c.amount), 0)

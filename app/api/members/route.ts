@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       .from('transactions')
       .select('member_id, amount')
       .not('member_id', 'is', null)
-      .in('type', ['expense', 'purchase'])
+      .eq('type', 'purchase')
 
     const result = (members ?? []).map(m => {
       const memberCharges = (charges ?? []).filter(c => c.member_id === m.id)

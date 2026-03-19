@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
         .from('transactions')
         .select('id, amount, description_he, date, notes, categories(name_he)')
         .eq('member_id', member.id)
-        .in('type', ['expense', 'purchase'])
+        .eq('type', 'purchase')
         .order('date', { ascending: true })
       if (dateFrom) purchasesQ = purchasesQ.gte('date', dateFrom)
       if (dateTo) purchasesQ = purchasesQ.lte('date', dateTo)
