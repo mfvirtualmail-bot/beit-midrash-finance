@@ -236,8 +236,11 @@ export const HEBREW_CALENDAR_ORDER: string[] = [
   // תשרי (Tishrei)
   'תשרי',
   'ראש השנה',
+  'פרשת וילך',       // שבת שובה — between R"H and Yom Kippur
   'צום גדליה',
+  'שבת שובה',
   'יום כיפור',
+  'פרשת האזינו',     // Shabbat between Yom Kippur and Sukkot
   'סוכות',
   'הושענא רבה',
   'שמחת תורה',
@@ -327,8 +330,6 @@ export const HEBREW_CALENDAR_ORDER: string[] = [
   'פרשת כי תצא',
   'פרשת כי תבוא',
   'פרשת נצבים',
-  'פרשת וילך',
-  'פרשת האזינו',
 ]
 
 // Map Hebrew month names to their starting index in HEBREW_CALENDAR_ORDER
