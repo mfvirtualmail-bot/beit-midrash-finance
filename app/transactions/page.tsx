@@ -115,8 +115,11 @@ export default function TransactionsPage() {
 
   const filteredCats = categories.filter(c => c.type === form.type)
 
-  const totalIncome = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  // Separate member payments (collected) from other income transactions
+  const totalCollected = txns.filter(t => (t as unknown as { is_member_payment?: boolean }).is_member_payment).reduce((s, t) => s + t.amount, 0)
+  const totalOtherIncome = txns.filter(t => t.type === 'income' && !(t as unknown as { is_member_payment?: boolean }).is_member_payment).reduce((s, t) => s + t.amount, 0)
   const totalExpense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const netBalance = totalCollected + totalOtherIncome - totalExpense
 
   return (
     <div className="space-y-6">
@@ -153,20 +156,28 @@ export default function TransactionsPage() {
       </div>
 
       {/* Totals */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">{T.income}</p>
-          <p className="text-lg font-bold text-green-600">{fmt(totalIncome)}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="card text-center py-3">
+          <p className="text-xs text-gray-500 mb-1">{T.totalCollected}</p>
+          <p className="text-base font-bold text-green-600">{fmt(totalCollected)}</p>
+          <p className="text-xs text-gray-400">{lang === 'he' ? 'תשלומי חברים' : 'Member payments'}</p>
         </div>
-        <div className="card text-center">
+        <div className="card text-center py-3">
+          <p className="text-xs text-gray-500 mb-1">{T.otherIncome}</p>
+          <p className="text-base font-bold text-teal-600">{fmt(totalOtherIncome)}</p>
+          <p className="text-xs text-gray-400">{lang === 'he' ? 'תרומות / הכנסות' : 'Donations / income'}</p>
+        </div>
+        <div className="card text-center py-3">
           <p className="text-xs text-gray-500 mb-1">{T.expense}</p>
-          <p className="text-lg font-bold text-red-600">{fmt(totalExpense)}</p>
+          <p className="text-base font-bold text-red-600">{fmt(totalExpense)}</p>
+          <p className="text-xs text-gray-400">{lang === 'he' ? 'הוצאות' : 'Expenses'}</p>
         </div>
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">{T.balance}</p>
-          <p className={`text-lg font-bold ${totalIncome - totalExpense >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-            {fmt(totalIncome - totalExpense)}
+        <div className="card text-center py-3">
+          <p className="text-xs text-gray-500 mb-1">{T.netBalance}</p>
+          <p className={`text-base font-bold ${netBalance >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+            {netBalance < 0 ? '-' : ''}{fmt(netBalance)}
           </p>
+          <p className="text-xs text-gray-400">{lang === 'he' ? 'הכנסה בפועל פחות הוצאות' : 'Actual income minus expenses'}</p>
         </div>
       </div>
 

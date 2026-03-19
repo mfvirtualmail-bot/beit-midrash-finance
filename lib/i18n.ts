@@ -261,6 +261,16 @@ export const translations = {
     // Clients
     clients: 'לקוחות',
     clientsDesc: 'חברים, תורמים ומבצעי רכישות',
+    // Financial breakdown
+    totalCharged: 'סה"כ חיובים',
+    totalCollected: 'נגבה',
+    totalOutstanding: 'יתרת חוב',
+    otherIncome: 'הכנסות אחרות',
+    actualIncome: 'הכנסה בפועל',
+    netBalance: 'מאזן בפועל',
+    netWithPledges: 'מאזן תיאורטי',
+    memberPaymentsReceived: 'תשלומי חברים שהתקבלו',
+    pledgesNotPaid: 'חיובים שלא שולמו',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -522,6 +532,16 @@ export const translations = {
     // Clients
     clients: 'Clients',
     clientsDesc: 'Members, donors & purchasers',
+    // Financial breakdown
+    totalCharged: 'Total Charged',
+    totalCollected: 'Collected',
+    totalOutstanding: 'Outstanding',
+    otherIncome: 'Other Income',
+    actualIncome: 'Actual Income',
+    netBalance: 'Net Balance',
+    netWithPledges: 'Theoretical Net',
+    memberPaymentsReceived: 'Member Payments Received',
+    pledgesNotPaid: 'Unpaid Charges',
   }
 }
 
