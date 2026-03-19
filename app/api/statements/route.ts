@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
 
 // GET /api/statements?member_id=1 or ?member_ids=1,2,3
 // Returns unified financial data: charges, payments, purchases, balance per member
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
           // Fallback: convert date to Hebrew month+year
           try {
             const hd = toHDate(c.date)
-            const monthName = MONTH_HE[hd.getMonth()] ?? ''
+            const monthName = getMonthNameHe(hd.getMonth(), hd.getFullYear())
             const yearStr = yearToGematriya(hd.getFullYear())
             period = `${monthName} ${yearStr}`
           } catch {
