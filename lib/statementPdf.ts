@@ -40,7 +40,7 @@ export async function buildMemberStatementData(
     .from('transactions')
     .select('id, amount, description_he, date, notes, categories(name_he)')
     .eq('member_id', memberId)
-    .in('type', ['expense', 'purchase'])
+    .eq('type', 'purchase')
     .order('date', { ascending: true })
   if (dateFrom) purchasesQ = purchasesQ.gte('date', dateFrom)
   if (dateTo) purchasesQ = purchasesQ.lte('date', dateTo)

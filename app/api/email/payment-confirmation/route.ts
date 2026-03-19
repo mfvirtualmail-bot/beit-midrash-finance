@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       .from('transactions')
       .select('amount')
       .eq('member_id', member_id)
-      .in('type', ['expense', 'purchase'])
+      .eq('type', 'purchase')
     const { data: paymentsData } = await supabase
       .from('member_payments')
       .select('amount')

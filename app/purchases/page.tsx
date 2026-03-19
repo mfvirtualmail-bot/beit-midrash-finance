@@ -190,7 +190,7 @@ function PurchasesPageInner() {
       saturday.setDate(sunday.getDate() + 6)
       const satStr = saturday.toISOString().split('T')[0]
 
-      const res = await fetch(`/api/transactions?type=expense&limit=500`)
+      const res = await fetch(`/api/transactions?type=purchase&limit=500`)
       const data = await res.json()
       // Filter to purchases in this week
       const weekPurchases = (data as ExistingPurchase[]).filter((tx: ExistingPurchase) =>
@@ -216,7 +216,7 @@ function PurchasesPageInner() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'expense',
+        type: 'purchase',
         amount: Number(editForm.amount),
         description_he: editPurchase.description_he,
         description_en: null,
@@ -270,7 +270,7 @@ function PurchasesPageInner() {
         ? `${memberName}${r.notes ? ' - ' + r.notes : ''}`
         : r.notes || null
       return {
-        type: 'expense',
+        type: 'purchase',
         amount: Number(r.amount),
         description_he: descHe,
         description_en: null,
