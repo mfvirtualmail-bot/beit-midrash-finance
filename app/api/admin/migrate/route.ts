@@ -50,6 +50,25 @@ WHERE type = 'expense'
     member_id IS NOT NULL
     OR category_id IN (SELECT id FROM categories WHERE type = 'purchase')
   );
+
+-- v11: Enable Row Level Security on ALL tables
+-- The app uses SUPABASE_SERVICE_ROLE_KEY which bypasses RLS,
+-- so all API routes continue to work. The public anon key
+-- will no longer be able to read/write any data.
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE member_charges ENABLE ROW LEVEL SECURITY;
+ALTER TABLE member_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donor_donations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recurring_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE collectors ENABLE ROW LEVEL SECURITY;
 `
 
 export async function POST() {
