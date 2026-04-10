@@ -17,6 +17,7 @@ Click the toolbar icon on any page to instantly see:
 - The **block type** per domain:
   - 🚫 **Blacklisted** — site was reviewed and explicitly blocked
   - ⏳ **Not whitelisted** — site is unknown, pending review
+  - ⚙️ **Personal settings** — blocked by the user's own NetFree settings
   - ❓ **Blocked** — 3rd-party sub-resource (type undetectable without the block page)
 - A **direct link** to open a pre-filled NetFree whitelist request for each blocked URL
 
@@ -55,7 +56,7 @@ Click the toolbar icon on any page to instantly see:
 |---|---|
 | Manifest | Version 3 |
 | Block signal | HTTP status 418 |
-| Block type detection | `block.avif` → blacklisted · `unknown.avif` → not whitelisted |
+| Block type detection | `block.avif` → blacklisted · `unknown.avif` → not whitelisted · `myset.avif` → personal settings |
 | State storage | `chrome.storage.session` (clears on browser close) |
 | Permissions | `webRequest`, `tabs`, `storage`, `webNavigation`, `<all_urls>` |
 

@@ -14,6 +14,7 @@ const T = {
     blocksSubFound:   'לחץ על "פתח בקשה" לפנייה ישירה לנט פרי',
     blacklisted:      '🚫 חסום — האתר ברשימה השחורה',
     notWhitelisted:   '⏳ לא ברשימה הלבנה — ממתין לאישור',
+    userSettings:     '⚙️ חסום בהגדרות אישיות',
     unknown:          '❓ חסום — צד שלישי',
     copyUrl:          'העתק',
     copyAll:          'העתק הכל',
@@ -34,6 +35,7 @@ const T = {
     blocksSubFound:   'Click "Open Request" to report directly to NetFree',
     blacklisted:      '🚫 Blacklisted — explicitly blocked',
     notWhitelisted:   '⏳ Not whitelisted — pending review',
+    userSettings:     '⚙️ Blocked by personal settings',
     unknown:          '❓ Blocked — 3rd party resource',
     copyUrl:          'Copy',
     copyAll:          'Copy All',
@@ -57,6 +59,11 @@ const BLOCK_META = {
     badgeClass: 'badge-not-whitelisted',
     stripClass: 'strip-not-whitelisted',
     label: (t) => t.notWhitelisted,
+  },
+  user_settings: {
+    badgeClass: 'badge-user-settings',
+    stripClass: 'strip-user-settings',
+    label: (t) => t.userSettings,
   },
   unknown: {
     badgeClass: 'badge-unknown',

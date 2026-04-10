@@ -4,6 +4,7 @@
 // Block types:
 //   'blacklisted'     — site was reviewed and explicitly blocked (block.avif)
 //   'not_whitelisted' — site is unknown / pending whitelist review (unknown.avif)
+//   'user_settings'   — blocked by the user's own personal settings (myset.avif)
 //   'unknown'         — sub-resource block; type undetectable without the block page
 
 const NETFREE_HOST = 'netfree.link';
@@ -110,6 +111,9 @@ chrome.webRequest.onCompleted.addListener(
         await setTabData(tabId, data);
       } else if (url.includes('unknown.avif')) {
         target.blockType = 'not_whitelisted';
+        await setTabData(tabId, data);
+      } else if (url.includes('myset.avif')) {
+        target.blockType = 'user_settings';
         await setTabData(tabId, data);
       }
     }
