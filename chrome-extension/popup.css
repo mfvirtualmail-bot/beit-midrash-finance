@@ -26,6 +26,11 @@
   --success-border: #A7F3D0;
   --success-text:   #047857;
 
+  --purple:         #8B5CF6;
+  --purple-bg:      #F5F3FF;
+  --purple-border:  #DDD6FE;
+  --purple-text:    #6D28D9;
+
   --neutral-bg:     #F9FAFB;
   --neutral-border: #E5E7EB;
   --neutral-text:   #6B7280;
@@ -274,9 +279,10 @@ body {
   height: 3px;
   width: 100%;
 }
-.strip-blacklisted    { background: var(--danger); }
+.strip-blacklisted     { background: var(--danger); }
 .strip-not-whitelisted { background: var(--warning); }
-.strip-unknown        { background: var(--neutral-border); }
+.strip-user-settings   { background: var(--purple); }
+.strip-unknown         { background: var(--neutral-border); }
 
 /* ── Card header ── */
 .block-card-head {
@@ -306,6 +312,11 @@ body {
   background: var(--warning-bg);
   color: var(--warning-text);
   border: 1px solid var(--warning-border);
+}
+.badge-user-settings {
+  background: var(--purple-bg);
+  color: var(--purple-text);
+  border: 1px solid var(--purple-border);
 }
 .badge-unknown {
   background: var(--neutral-bg);
