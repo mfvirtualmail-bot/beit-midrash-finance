@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
       .eq('token', token).gt('expires_at', new Date().toISOString()).single()
     if (!session) return NextResponse.json(null)
     const { data: user } = await supabase.from('users')
-      .select('id, username, display_name').eq('id', session.user_id).single()
+      .select('id, username, display_name, role').eq('id', session.user_id).single()
     return NextResponse.json(user ?? null)
   } catch { return NextResponse.json(null) }
 }

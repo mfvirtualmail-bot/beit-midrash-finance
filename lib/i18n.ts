@@ -269,6 +269,20 @@ export const translations = {
     netWithPledges: 'מאזן תיאורטי',
     memberPaymentsReceived: 'תשלומי חברים שהתקבלו',
     pledgesNotPaid: 'חיובים שלא שולמו',
+    // Admin
+    admin: 'ניהול',
+    superAdmin: 'מנהל עליון',
+    manageUsers: 'נהל משתמשים',
+    users: 'משתמשים',
+    userRole: 'תפקיד',
+    role: 'תפקיד',
+    user: 'משתמש',
+    superAdminRole: 'מנהל עליון',
+    resetPassword: 'שינוי סיסמה',
+    newPasswordRequired: 'סיסמה חדשה',
+    userManagement: 'ניהול משתמשים',
+    noUsers: 'אין משתמשים',
+    updateUser: 'עדכן משתמש',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -538,6 +552,20 @@ export const translations = {
     netWithPledges: 'Theoretical Net',
     memberPaymentsReceived: 'Member Payments Received',
     pledgesNotPaid: 'Unpaid Charges',
+    // Admin
+    admin: 'Admin',
+    superAdmin: 'Super Admin',
+    manageUsers: 'Manage Users',
+    users: 'Users',
+    userRole: 'Role',
+    role: 'Role',
+    user: 'User',
+    superAdminRole: 'Super Admin',
+    resetPassword: 'Change Password',
+    newPasswordRequired: 'New Password',
+    userManagement: 'User Management',
+    noUsers: 'No users',
+    updateUser: 'Update User',
   }
 }
 
