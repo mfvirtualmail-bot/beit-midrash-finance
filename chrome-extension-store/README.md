@@ -8,7 +8,7 @@ This folder contains **everything you need** to publish NetFree Inspector to the
 
 | File | Purpose |
 |---|---|
-| `netfree-inspector-v1.2.0.zip` | **The upload file.** Drop this into the Chrome Web Store dashboard. |
+| `netfree-inspector-v1.3.0.zip` | **The upload file.** Drop this into the Chrome Web Store dashboard. |
 | `store-listing-he.md` | Hebrew store page text (name, short description, long description) |
 | `store-listing-en.md` | English store page text (same, in English) |
 | `privacy-policy.md` | Privacy policy — must be published as a public web page before submission |
@@ -70,7 +70,7 @@ Follow `screenshots-guide.md` to capture at least 1 (ideally 5) screenshots at 1
 Once you have:
 - ✅ Developer account paid for
 - ✅ Privacy policy URL (public and reachable)
-- ✅ `netfree-inspector-v1.2.0.zip` (in this folder — already built)
+- ✅ `netfree-inspector-v1.3.0.zip` (in this folder — already built)
 - ✅ `promo-tile.png` (converted from SVG)
 - ✅ At least 1 screenshot at 1280×800
 
@@ -79,7 +79,7 @@ Once you have:
 ### Step 1 — Upload the ZIP
 1. Go to https://chrome.google.com/webstore/devconsole/
 2. Click **"New item"** (top right).
-3. Drag `netfree-inspector-v1.2.0.zip` into the upload area.
+3. Drag `netfree-inspector-v1.3.0.zip` into the upload area.
 4. Wait ~10 seconds for Chrome to parse the manifest.
 5. You'll be taken to the item's edit page.
 
@@ -172,7 +172,7 @@ When you want to push a new version:
 3. Re-run the ZIP build:
    ```
    cd chrome-extension
-   zip -r ../chrome-extension-store/netfree-inspector-v1.2.0.zip . -x "create-icons.js" "README.md"
+   zip -r ../chrome-extension-store/netfree-inspector-v1.3.0.zip . -x "create-icons.js" "README.md"
    ```
 4. In the developer console, click the item → **Package** tab → **Upload new package** → drag in the new ZIP.
 5. Submit for review again.
@@ -183,7 +183,7 @@ Updating screenshots, description, or privacy policy **does not** require code r
 
 ## Quick checklist before submitting
 
-- [ ] `netfree-inspector-v1.2.0.zip` exists in this folder
+- [ ] `netfree-inspector-v1.3.0.zip` exists in this folder
 - [ ] `promo-tile.png` (exactly 440×280, PNG) exported from the SVG
 - [ ] At least 1 screenshot (1280×800 PNG)
 - [ ] Privacy policy is live at a public URL

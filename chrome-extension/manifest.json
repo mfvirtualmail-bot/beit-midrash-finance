@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NetFree Inspector",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "גלה חסימות נט פרי בכל דף באחת — Instantly detect NetFree content filter blocks on any page",
   "permissions": [
     "webRequest",
@@ -22,6 +22,10 @@
       "48": "icons/icon48-green.png",
       "128": "icons/icon128-green.png"
     }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   },
   "icons": {
     "16": "icons/icon16.png",

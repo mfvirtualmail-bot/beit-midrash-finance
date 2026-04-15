@@ -1,16 +1,21 @@
 // NetFree Inspector — Harmless-domain list
 //
-// These domains almost always represent third-party ads, analytics, trackers,
-// or social pixels that NetFree blocks but whose absence doesn't break the page.
-// They're hidden by default in the popup; users can toggle them on.
+// Blocks against these domains almost always represent third-party ads,
+// analytics, trackers, or social pixels. NetFree blocks them, but their
+// absence doesn't break the page. They're hidden by default in the popup.
 //
-// Kept conservative on purpose — inclusion here means "blocking this never
-// stops a normal user from doing what they came to do."
+// Matching is case-insensitive suffix match on the request's hostname:
+//   "doubleclick.net"  matches  "ad.doubleclick.net" and "doubleclick.net"
 //
-// Matches are on the request's hostname (case-insensitive, suffix match).
-// e.g. "doubleclick.net" matches "ad.doubleclick.net" and "stats.g.doubleclick.net".
+// ── Sources (merged at runtime, deduplicated) ────────────────────────────
+//   1. BUNDLED_FALLBACK  — hardcoded below, always available offline.
+//   2. Remote JSON       — fetched once per day from GitHub Pages:
+//        https://mfvirtualmail-bot.github.io/beit-midrash-finance/
+//                netfree-inspector/harmless-domains.json
+//      Cached in chrome.storage.local, falls back gracefully if offline.
+//   3. User custom list  — entries the user added via the options page.
 
-const HARMLESS_DOMAIN_SUFFIXES = [
+const BUNDLED_FALLBACK = [
   // ── Google ads / analytics / tag manager ────────────────────────────────
   'doubleclick.net',
   'googlesyndication.com',
@@ -45,8 +50,7 @@ const HARMLESS_DOMAIN_SUFFIXES = [
   'amplitude.com',
   'heap.io',
   'heapanalytics.com',
-  'clarity.ms',          // Microsoft Clarity
-  'bing.com/bat.js',     // (path match ignored — hostname match below)
+  'clarity.ms',
   'bat.bing.com',
 
   // ── General ad networks ─────────────────────────────────────────────────
@@ -65,11 +69,6 @@ const HARMLESS_DOMAIN_SUFFIXES = [
   'quantcount.com',
   'adform.net',
 
-  // ── Israeli ad / analytics ──────────────────────────────────────────────
-  'walla.co.il/adv',     // (path ignored — hostname match if specific)
-  'ynet.co.il/ads',      // (path ignored)
-  'adsnative.com',
-
   // ── Tag / consent managers ──────────────────────────────────────────────
   'onetrust.com',
   'cookielaw.org',
@@ -86,16 +85,91 @@ const HARMLESS_DOMAIN_SUFFIXES = [
   'rollbar.com',
 ];
 
+const REMOTE_URL =
+  'https://mfvirtualmail-bot.github.io/beit-midrash-finance/netfree-inspector/harmless-domains.json';
+
+const REMOTE_CACHE_KEY = 'harmlessRemoteCache';
+const USER_CUSTOM_KEY  = 'harmlessUserList';
+const REFRESH_EVERY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// ── In-memory active suffix set (rebuilt after any change) ────────────────
+let activeSuffixes = new Set(BUNDLED_FALLBACK.map(s => s.toLowerCase()));
+
+function rebuildSet(remoteDomains, userDomains) {
+  const set = new Set(BUNDLED_FALLBACK.map(s => s.toLowerCase()));
+  if (Array.isArray(remoteDomains)) {
+    for (const d of remoteDomains) {
+      if (typeof d === 'string' && d.trim()) set.add(d.trim().toLowerCase());
+    }
+  }
+  if (Array.isArray(userDomains)) {
+    for (const d of userDomains) {
+      if (typeof d === 'string' && d.trim()) set.add(d.trim().toLowerCase());
+    }
+  }
+  activeSuffixes = set;
+}
+
+async function loadCachedAndUser() {
+  try {
+    const r = await chrome.storage.local.get([REMOTE_CACHE_KEY, USER_CUSTOM_KEY]);
+    const remoteList = r[REMOTE_CACHE_KEY]?.domains;
+    const userList   = r[USER_CUSTOM_KEY];
+    rebuildSet(remoteList, userList);
+  } catch {
+    // storage unavailable — fallback stays active
+  }
+}
+
+async function refreshRemoteIfStale() {
+  try {
+    const r       = await chrome.storage.local.get(REMOTE_CACHE_KEY);
+    const cached  = r[REMOTE_CACHE_KEY];
+    const fetched = cached?.fetchedAt ?? 0;
+    if (Date.now() - fetched < REFRESH_EVERY_MS) return; // still fresh
+
+    const res = await fetch(REMOTE_URL, { cache: 'no-cache' });
+    if (!res.ok) return;
+    const json = await res.json();
+    if (!Array.isArray(json.domains)) return;
+
+    await chrome.storage.local.set({
+      [REMOTE_CACHE_KEY]: {
+        domains:   json.domains,
+        version:   json.version ?? null,
+        updated:   json.updated ?? null,
+        fetchedAt: Date.now(),
+      },
+    });
+    await loadCachedAndUser();
+  } catch {
+    // offline / blocked / malformed — we just keep the previous cache
+  }
+}
+
 function isHarmlessHost(hostname) {
   if (!hostname) return false;
   const h = hostname.toLowerCase();
-  for (const suffix of HARMLESS_DOMAIN_SUFFIXES) {
-    // suffix match: "doubleclick.net" ⇒ matches "x.doubleclick.net" and "doubleclick.net"
+  for (const suffix of activeSuffixes) {
     if (h === suffix || h.endsWith('.' + suffix)) return true;
   }
   return false;
 }
 
-// Exported via service-worker global scope (importScripts)
-self.isHarmlessHost            = isHarmlessHost;
-self.HARMLESS_DOMAIN_SUFFIXES  = HARMLESS_DOMAIN_SUFFIXES;
+// React to live changes from the options page — rebuild the set immediately.
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes[USER_CUSTOM_KEY] || changes[REMOTE_CACHE_KEY]) {
+      loadCachedAndUser();
+    }
+  });
+}
+
+// Kick off initial load + refresh on service-worker startup.
+loadCachedAndUser().then(() => refreshRemoteIfStale());
+
+// Export to service-worker scope (importScripts)
+self.isHarmlessHost       = isHarmlessHost;
+self.refreshHarmlessList  = refreshRemoteIfStale;
+self.HARMLESS_REMOTE_URL  = REMOTE_URL;

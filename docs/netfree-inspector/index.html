@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NetFree Inspector — גלה חסימות נט פרי בכל דף</title>
+<meta name="description" content="תוסף Chrome שמציג חסימות של נט פרי בזמן אמת, מסביר סוג חסימה ופותח בקשת וייטליסט בלחיצה אחת." />
+<style>
+  :root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #0f172a;
+    --muted: #475569;
+    --brand: #1a6dff;
+    --brand-dark: #0845c8;
+    --accent: #059669;
+    --alert: #dc2626;
+    --border: #e2e8f0;
+    --radius: 14px;
+    --shadow: 0 4px 16px rgba(15,23,42,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Heebo', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+  }
+  html[lang="en"] body { direction: ltr; }
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 20px; }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    padding: 48px 20px 32px;
+  }
+  .hero-logo {
+    width: 96px; height: 96px; margin-bottom: 16px;
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    background: linear-gradient(180deg, #3b8bff 0%, #0845c8 100%);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .hero-logo svg { filter: drop-shadow(0 2px 6px rgba(0,0,0,.15)); }
+  .hero h1 {
+    font-size: 40px; font-weight: 800; margin: 10px 0 8px;
+    background: linear-gradient(90deg, var(--brand) 0%, var(--brand-dark) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+  }
+  .hero .tagline { font-size: 18px; color: var(--muted); margin: 0 0 24px; }
+  .hero-cta {
+    display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 15px;
+    text-decoration: none; transition: transform .1s ease, box-shadow .2s ease;
+  }
+  .btn-primary {
+    background: var(--brand); color: white;
+    box-shadow: 0 4px 12px rgba(26,109,255,.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(26,109,255,.4); }
+  .btn-secondary {
+    background: white; color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: #f1f5f9; }
+
+  .lang-switch {
+    position: absolute; top: 20px; inset-inline-end: 20px;
+    background: white; border: 1px solid var(--border); border-radius: 999px;
+    padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    color: var(--muted);
+  }
+  .lang-switch:hover { color: var(--text); }
+
+  /* ── Sections ── */
+  section { margin: 36px 0; }
+  h2 { font-size: 26px; margin: 0 0 18px; }
+
+  /* ── Feature grid ── */
+  .features {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .feature {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .feature .emoji { font-size: 28px; display: block; margin-bottom: 8px; }
+  .feature h3 { margin: 4px 0 6px; font-size: 17px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  /* ── Block-type legend ── */
+  .blocks {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .block-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px dashed var(--border);
+  }
+  .block-row:last-child { border-bottom: none; }
+  .block-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-red   { background: var(--alert); }
+  .dot-amber { background: #f59e0b; }
+  .dot-purple{ background: #8b5cf6; }
+  .dot-cyan  { background: #0891b2; }
+  .dot-gray  { background: #94a3b8; }
+  .block-row b { font-size: 14px; }
+  .block-row span { color: var(--muted); font-size: 13px; }
+
+  /* ── Footer ── */
+  footer {
+    margin: 48px 0 20px; padding-top: 24px;
+    border-top: 1px solid var(--border);
+    text-align: center; color: var(--muted); font-size: 13px;
+  }
+  footer a { color: var(--brand); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <button class="lang-switch" id="langSwitch" type="button">English</button>
+
+  <div class="wrap">
+
+    <!-- ── Hero ── -->
+    <div class="hero">
+      <div class="hero-logo" aria-hidden="true">
+        <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <path d="M32 6 L52 14 L52 30 C52 42 43 52 32 58 C21 52 12 42 12 30 L12 14 Z"
+                fill="white" stroke="none"/>
+          <polyline points="22,32 30,40 44,24" fill="none" stroke="#1a6dff"
+                    stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1 class="lang-he">NetFree Inspector</h1>
+      <h1 class="lang-en hidden">NetFree Inspector</h1>
+      <p class="tagline lang-he">גלה חסימות נט פרי בכל דף — מיידי, בשפה שלך, בלחיצה אחת.</p>
+      <p class="tagline lang-en hidden">Instantly see every NetFree block on any page — in your language, one click away.</p>
+
+      <div class="hero-cta">
+        <a class="btn btn-primary" id="storeBtn" href="https://chromewebstore.google.com/" target="_blank" rel="noopener">
+          <span class="lang-he">התקן ל-Chrome</span>
+          <span class="lang-en hidden">Install for Chrome</span>
+        </a>
+        <a class="btn btn-secondary" href="https://github.com/mfvirtualmail-bot/beit-midrash-finance/tree/main/chrome-extension" target="_blank" rel="noopener">
+          <span class="lang-he">קוד מקור ב-GitHub</span>
+          <span class="lang-en hidden">Source on GitHub</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── Features ── -->
+    <section>
+      <h2 class="lang-he">מה זה עושה</h2>
+      <h2 class="lang-en hidden">What it does</h2>
+      <div class="features">
+        <div class="feature">
+          <span class="emoji">🛡️</span>
+          <h3 class="lang-he">זיהוי מיידי</h3>
+          <h3 class="lang-en hidden">Instant detection</h3>
+          <p class="lang-he">מזהה כל תשובת HTTP 418 — האות של נט פרי לחסימה — בדיוק כשהדפדפן מקבל אותה.</p>
+          <p class="lang-en hidden">Detects every HTTP 418 — NetFree's block signal — the moment the browser receives it.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">🔢</span>
+          <h3 class="lang-he">Badge חכם</h3>
+          <h3 class="lang-en hidden">Smart badge</h3>
+          <p class="lang-he">מונה חסימות משמעותיות (לא פרסומות/מעקב) — ירוק כשנקי, אדום כשיש בעיה אמיתית.</p>
+          <p class="lang-en hidden">Counts meaningful blocks only (ads &amp; trackers excluded) — green when clean, red when it actually matters.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">🎫</span>
+          <h3 class="lang-he">פתח בקשה בלחיצה</h3>
+          <h3 class="lang-en hidden">One-click requests</h3>
+          <p class="lang-he">פותח טופס וייטליסט ממולא מראש ישירות באתר נט פרי.</p>
+          <p class="lang-en hidden">Opens a pre-filled NetFree whitelist ticket right from the popup.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">🌐</span>
+          <h3 class="lang-he">עברית ואנגלית</h3>
+          <h3 class="lang-en hidden">Hebrew &amp; English</h3>
+          <p class="lang-he">ממשק דו-לשוני מלא עם תמיכה ב-RTL.</p>
+          <p class="lang-en hidden">Fully bilingual interface with RTL support.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">🔒</span>
+          <h3 class="lang-he">פרטיות קודם</h3>
+          <h3 class="lang-en hidden">Privacy first</h3>
+          <p class="lang-he">הכל נעשה מקומית בדפדפן שלך. שום URL לא נשלח לשרתים שלנו.</p>
+          <p class="lang-en hidden">Everything runs locally in your browser. Not a single URL leaves your machine.</p>
+        </div>
+        <div class="feature">
+          <span class="emoji">⚡</span>
+          <h3 class="lang-he">רשימה מתעדכנת</h3>
+          <h3 class="lang-en hidden">Live-updated list</h3>
+          <p class="lang-he">רשימת הפרסומות/מעקב הנפוצים מתעדכנת אוטומטית ללא צורך בהתקנה מחדש.</p>
+          <p class="lang-en hidden">The ad &amp; tracker exclusion list auto-refreshes daily — no re-install needed.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Block types ── -->
+    <section>
+      <h2 class="lang-he">סוגי חסימות שהתוסף מזהה</h2>
+      <h2 class="lang-en hidden">Block types detected</h2>
+      <div class="blocks">
+        <div class="block-row">
+          <span class="block-dot dot-red"></span>
+          <b class="lang-he">🚫 רשימה שחורה</b>
+          <b class="lang-en hidden">🚫 Blacklisted</b>
+          <span class="lang-he">— האתר נסקר ונחסם במפורש</span>
+          <span class="lang-en hidden">— site reviewed and explicitly blocked</span>
+        </div>
+        <div class="block-row">
+          <span class="block-dot dot-amber"></span>
+          <b class="lang-he">⏳ לא ברשימה הלבנה</b>
+          <b class="lang-en hidden">⏳ Not whitelisted</b>
+          <span class="lang-he">— ממתין לאישור / בסקירה</span>
+          <span class="lang-en hidden">— pending review</span>
+        </div>
+        <div class="block-row">
+          <span class="block-dot dot-purple"></span>
+          <b class="lang-he">⚙️ הגדרות אישיות</b>
+          <b class="lang-en hidden">⚙️ Personal settings</b>
+          <span class="lang-he">— המשתמש חסם את זה בהגדרות שלו</span>
+          <span class="lang-en hidden">— user's own filter settings</span>
+        </div>
+        <div class="block-row">
+          <span class="block-dot dot-cyan"></span>
+          <b class="lang-he">📁 סוג קובץ</b>
+          <b class="lang-en hidden">📁 File type</b>
+          <span class="lang-he">— סוג קובץ שלא נתמך בסינון אוטומטי (zip/exe וכו׳)</span>
+          <span class="lang-en hidden">— file type not supported by automatic filtering (zip/exe/etc.)</span>
+        </div>
+        <div class="block-row">
+          <span class="block-dot dot-gray"></span>
+          <b class="lang-he">❓ צד שלישי</b>
+          <b class="lang-en hidden">❓ Third-party</b>
+          <span class="lang-he">— תת-משאב שנחסם, סוג לא מזוהה</span>
+          <span class="lang-en hidden">— sub-resource block, type undetectable</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Contribute ── -->
+    <section>
+      <h2 class="lang-he">עזור לשפר את הרשימה</h2>
+      <h2 class="lang-en hidden">Help improve the list</h2>
+      <p class="lang-he">רשימת הפרסומות והמעקב שהתוסף מסתיר נשמרת בקובץ פתוח ב-GitHub. ראית domain שחסום ושכדאי להוסיף? פתח PR או issue:</p>
+      <p class="lang-en hidden">The ad &amp; tracker list the extension hides is maintained as an open file on GitHub. Spotted a domain that should be added? Open a PR or issue:</p>
+      <a class="btn btn-secondary" href="https://github.com/mfvirtualmail-bot/beit-midrash-finance/blob/main/docs/netfree-inspector/harmless-domains.json" target="_blank" rel="noopener">
+        📝 harmless-domains.json
+      </a>
+    </section>
+
+    <footer>
+      <p class="lang-he">
+        NetFree Inspector — קוד פתוח תחת MIT |
+        <a href="https://github.com/mfvirtualmail-bot/beit-midrash-finance/blob/main/chrome-extension-store/privacy-policy.md">מדיניות פרטיות</a> |
+        <a href="https://github.com/mfvirtualmail-bot/beit-midrash-finance/issues">דווח על בעיה</a>
+      </p>
+      <p class="lang-en hidden">
+        NetFree Inspector — MIT-licensed open source |
+        <a href="https://github.com/mfvirtualmail-bot/beit-midrash-finance/blob/main/chrome-extension-store/privacy-policy.md">Privacy policy</a> |
+        <a href="https://github.com/mfvirtualmail-bot/beit-midrash-finance/issues">Report an issue</a>
+      </p>
+      <p>
+        <small>This extension is an independent community project and is not affiliated with or endorsed by NetFree.</small>
+      </p>
+    </footer>
+
+  </div>
+
+<script>
+  // Simple language toggle — persists in localStorage
+  (function () {
+    const KEY = 'nfi-landing-lang';
+    const btn = document.getElementById('langSwitch');
+
+    function apply(lang) {
+      document.documentElement.lang = lang;
+      document.documentElement.dir  = lang === 'he' ? 'rtl' : 'ltr';
+      document.querySelectorAll('.lang-he').forEach(el => el.classList.toggle('hidden', lang !== 'he'));
+      document.querySelectorAll('.lang-en').forEach(el => el.classList.toggle('hidden', lang !== 'en'));
+      btn.textContent = lang === 'he' ? 'English' : 'עברית';
+    }
+
+    // Auto-detect on first visit
+    let current = localStorage.getItem(KEY);
+    if (!current) {
+      current = (navigator.language || 'he').toLowerCase().startsWith('he') ? 'he' : 'en';
+    }
+    apply(current);
+
+    btn.addEventListener('click', () => {
+      current = current === 'he' ? 'en' : 'he';
+      localStorage.setItem(KEY, current);
+      apply(current);
+    });
+  })();
+</script>
+</body>
+</html>

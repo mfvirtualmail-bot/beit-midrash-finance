@@ -5,6 +5,8 @@
 //   'blacklisted'     — site was reviewed and explicitly blocked (block.avif)
 //   'not_whitelisted' — site is unknown / pending whitelist review (unknown.avif)
 //   'user_settings'   — blocked by the user's own personal settings (myset.avif)
+//   'file_type'       — file type not supported by automatic filtering
+//                       (netfree_full_logo.svg served on the block page, no .avif)
 //   'unknown'         — sub-resource block; type undetectable without the block page
 
 // Load the shared harmless-domain classifier into the service-worker scope
@@ -154,6 +156,15 @@ chrome.webRequest.onCompleted.addListener(
       } else if (url.includes('myset.avif')) {
         target.blockType = 'user_settings';
         await setTabData(tabId, data);
+      } else if (url.includes('netfree_full_logo.svg')) {
+        // File-type block: NetFree won't automatically filter this file type
+        // (zip/exe/etc). The block page shows the plain logo, no .avif image.
+        // Only classify as file_type if we haven't already classified as one
+        // of the avif-backed types — avif detection is more authoritative.
+        if (target.blockType === 'unknown') {
+          target.blockType = 'file_type';
+          await setTabData(tabId, data);
+        }
       }
     }
   },
@@ -208,6 +219,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 
     case 'GET_TAB_URL':
       chrome.tabs.get(msg.tabId, (tab) => reply({ url: tab?.url ?? '' }));
+      return true;
+
+    case 'REFRESH_HARMLESS_LIST':
+      if (typeof self.refreshHarmlessList === 'function') {
+        self.refreshHarmlessList().then(() => reply({ ok: true }));
+      } else {
+        reply({ ok: false });
+      }
       return true;
   }
 });
