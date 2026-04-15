@@ -697,4 +697,87 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 
 ---
 
+### Session 12 — 2026-04-10
+
+**Branch:** `claude/new-chrome-extension-pGE68`
+
+**What was built: NetFree Inspector Chrome Extension (v1.1.0)**
+
+A standalone Chrome extension (Manifest V3) that detects HTTP 418 responses from the NetFree content filter and shows blocked URLs in a popup. Entirely separate from the Beit Midrash Finance app — lives in `chrome-extension/` subfolder of this repo. Will be published to the Chrome Web Store.
+
+**Files created:**
+- `chrome-extension/manifest.json` — MV3 manifest, permissions: webRequest/tabs/storage/webNavigation + `<all_urls>` host permission; CSP allows `https://netfree.link` for img-src
+- `chrome-extension/background.js` — Service worker; listens for HTTP 418 via `chrome.webRequest.onCompleted`; detects block type via `.avif` filename in response URL (`block.avif` = blacklisted, `unknown.avif` = not whitelisted, `myset.avif` = user_settings); stores data in `chrome.storage.session`; clears on navigation
+- `chrome-extension/popup.html` — Extension popup shell; loads NetFree logo from `https://netfree.link/img/logo/netfree_logo.svg`
+- `chrome-extension/popup.js` — Popup logic; bilingual Hebrew/English; groups blocked URLs by domain; "Open Request" button generates pre-filled NetFree whitelist ticket: `https://netfree.link/app/#/tickets/new?u={url}&r={referrer}&t=site&bi=`; copy-all URLs button; badge count display
+- `chrome-extension/popup.css` — Modern card-based UI; color-coded block types: red (blacklisted), amber (not_whitelisted), purple (user_settings), gray (unknown); full RTL Hebrew + LTR English support
+- `chrome-extension/create-icons.js` — Pure Node.js PNG generator (no dependencies); creates blue-circle + white-shield + checkmark icons at 16/32/48/128px using zlib + manual CRC32
+- `chrome-extension/icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` — Pre-generated icons
+- `chrome-extension/README.md` — Developer setup guide
+
+**Block types detected:**
+| Type | Signal | Badge color |
+|---|---|---|
+| Blacklisted | `block.avif` in response URL | Red 🔴 |
+| Not whitelisted | `unknown.avif` in response URL | Amber 🟡 |
+| User settings | `myset.avif` in response URL | Purple 🟣 |
+| Unknown/third-party | HTTP 418, no avif match | Gray ⚪ |
+
+**Known gap (v1.2 TODO):** NetFree also has a **file-type block** (for .zip, executable files etc.) where the block page says "This type of file is not supported by automatic filtering." This block page uses `netfree_full_logo.svg` instead of `.avif` images — current extension doesn't classify it distinctly.
+
+**Commits:**
+- `2f2dcbd` — initial extension build
+- `8f1058d` — added user_settings block type (myset.avif), bumped version to 1.1.0
+
+**Git state:** On branch `claude/new-chrome-extension-pGE68`, pushed to origin.
+
+---
+
+### Session 13 — 2026-04-10 to 2026-04-12
+
+**Branch:** `claude/new-chrome-extension-pGE68` (continuing)
+
+**What was built: Chrome Web Store submission kit**
+
+Created `chrome-extension-store/` folder at repo root with all assets needed to publish to the Chrome Web Store.
+
+**Files created:**
+- `chrome-extension-store/store-listing-he.md` — Hebrew Chrome Web Store listing (name, short description ≤132 chars, full detailed description)
+- `chrome-extension-store/store-listing-en.md` — English Chrome Web Store listing
+- `chrome-extension-store/privacy-policy.md` — Bilingual (English + Hebrew) privacy policy; required for `<all_urls>` host permission; explains local-only processing, `chrome.storage.session`, one logo request to netfree.link
+- `chrome-extension-store/promo-tile.svg` — 440×280 promotional tile (SVG vector); blue gradient background, white shield+checkmark icon, "NetFree Inspector" title, Hebrew/English taglines, 4 block-type badge icons; **must be converted to PNG before upload** (use cloudconvert.com or Photopea)
+- `chrome-extension-store/screenshots-guide.md` — Guide to taking 5 Chrome Web Store screenshots at 1280×800; explains what to show in each shot and how to resize
+- `chrome-extension-store/netfree-inspector-v1.1.0.zip` — Pre-built upload-ready ZIP (15 KB, 10 files); contains all extension files with `manifest.json` at root; excludes dev-only `create-icons.js` and `README.md`
+- `chrome-extension-store/README.md` — Full step-by-step Chrome Web Store submission walkthrough including permission justifications for Privacy tab, common rejection reasons, version update instructions
+
+**Commit:** `1a457e6`
+
+**Chrome Web Store submission status (as of session end):**
+- ✅ ZIP built and verified correct structure
+- ✅ All store listing text ready
+- ✅ Privacy policy written (needs public URL — use GitHub raw link after merging to main)
+- ✅ Promo tile SVG created (needs PNG conversion)
+- ⏳ 2-step verification must be enabled on developer Google account before ZIP upload is accepted
+- ⏳ At least 1 screenshot (1280×800 PNG, no alpha channel) needed
+- ⏳ PR not yet merged to main
+
+**Issues discovered during this session:**
+
+1. **NetFree blocks `raw.githubusercontent.com` for .zip files** — File-type block, HTTP 418 returned. GitHub raw URLs for binary files won't work for users behind NetFree. Workaround: base64-encode the ZIP in chat, user decodes with PowerShell `[Convert]::FromBase64String()`.
+
+2. **Chrome Web Store requires 2-step verification** — Error: "Enabling 2 step verification on your account is required for security purposes." Must enable at `https://myaccount.google.com/signinoptions/twosv` before upload will succeed.
+
+3. **Screenshot requirements** — Must be exactly 1280×800 or 640×400 pixels, PNG/JPEG, no alpha channel, ≤5 MB. Other sizes rejected.
+
+4. **NetFree logo warning** — User asked about using NetFree's logo as the extension icon. Advised strongly against it: trademark/copyright risk, Chrome Web Store impersonation policy would reject it, and user confusion. Existing blue-shield-checkmark icon is correct and original.
+
+**To merge to main:**
+```
+https://github.com/mfvirtualmail-bot/beit-midrash-finance/compare/main...claude/new-chrome-extension-pGE68
+```
+
+**Git state:** On branch `claude/new-chrome-extension-pGE68`, pushed to origin. Awaiting manual PR merge to main.
+
+---
+
 *This file is updated at the end of every session. Always read it at the start of a new session to restore context.*
