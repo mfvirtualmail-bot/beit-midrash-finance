@@ -69,6 +69,10 @@ ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recurring_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE collectors ENABLE ROW LEVEL SECURITY;
+
+-- v12: Add role column to users table for super admin control
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role text DEFAULT 'user' CHECK (role IN ('super_admin', 'user'));
+UPDATE users SET role = 'super_admin' WHERE username = 'admin';
 `
 
 export async function POST() {
