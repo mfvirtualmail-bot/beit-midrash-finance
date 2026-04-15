@@ -2,7 +2,7 @@
 import './globals.css'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User, Calendar, UserCheck, Banknote, Contact, Shield } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User, Calendar, UserCheck, Banknote, Contact, Shield, Clock } from 'lucide-react'
 import { LangProvider, useLang } from '@/lib/LangContext'
 import { useState, useEffect } from 'react'
 
@@ -40,6 +40,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: '/', label: T.dashboard, icon: LayoutDashboard },
     { href: '/transactions', label: T.transactions, icon: ArrowLeftRight },
     { href: '/calendar', label: T.calendar, icon: Calendar },
+    { href: '/services', label: lang === 'he' ? 'זמנים לתפילות' : 'Prayer Timings', icon: Clock },
     { href: '/purchases', label: lang === 'he' ? 'רכישות שבועיות' : 'Weekly Purchases', icon: ShoppingCart },
     { href: '/recurring', label: T.recurring, icon: RefreshCw },
     { href: '/payments', label: lang === 'he' ? 'תשלומים' : 'Payments', icon: Banknote },

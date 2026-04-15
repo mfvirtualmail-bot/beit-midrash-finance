@@ -283,6 +283,15 @@ export const translations = {
     userManagement: 'ניהול משתמשים',
     noUsers: 'אין משתמשים',
     updateUser: 'עדכן משתמש',
+    // Services / Prayer Timings
+    services: 'זמנים לתפילות',
+    prayerTimings: 'זמנים לתפילות',
+    mincha: 'מנחה',
+    shacharit: 'שחרית',
+    maariv: 'מעריב',
+    kiddush: 'קידוש',
+    sunset: 'שקיעה',
+    hebrewDateColumn: 'תאריך עברי',
   },
   en: {
     appName: 'Finance Manager - Beit Midrash',
@@ -566,6 +575,15 @@ export const translations = {
     userManagement: 'User Management',
     noUsers: 'No users',
     updateUser: 'Update User',
+    // Services / Prayer Timings
+    services: 'Prayer Timings',
+    prayerTimings: 'Prayer Timings',
+    mincha: 'Mincha',
+    shacharit: 'Shacharit',
+    maariv: 'Maariv',
+    kiddush: 'Kiddush',
+    sunset: 'Sunset',
+    hebrewDateColumn: 'Hebrew Date',
   }
 }
 
