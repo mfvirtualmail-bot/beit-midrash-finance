@@ -10,6 +10,8 @@ const T = {
     noBlocks:         'לא נמצאו חסימות',
     noBlocksSub:      'כל הבקשות בדף זה עברו בהצלחה דרך נט פרי.',
     noBlocksHint:     'אם הדף לא עובד כראוי, נסה לרענן.',
+    noMeaningful:     'לא נמצאו חסימות משמעותיות',
+    noMeaningfulSub:  'נמצאו רק חסימות פרסומות/מעקב שלא משפיעות על הדף.',
     blocksFound:      (n) => `נמצאו ${n} חסימ${n === 1 ? 'ה' : 'ות'} בדף זה`,
     blocksSubFound:   'לחץ על "פתח בקשה" לפנייה ישירה לנט פרי',
     blacklisted:      '🚫 חסום — האתר ברשימה השחורה',
@@ -24,6 +26,7 @@ const T = {
     requests:         (n) => `${n} ${n === 1 ? 'בקשה' : 'בקשות'}`,
     moreRequests:     (n) => `+ ${n} בקשות נוספות`,
     loading:          'טוען…',
+    harmlessHidden:   (n) => `+ ${n} חסימות פרסומות/מעקב מוסתרות`,
   },
   en: {
     subtitle:         'Block Inspector',
@@ -31,6 +34,8 @@ const T = {
     noBlocks:         'No blocks detected',
     noBlocksSub:      'All requests on this page passed through NetFree successfully.',
     noBlocksHint:     'If the page isn\'t working correctly, try reloading below.',
+    noMeaningful:     'No meaningful blocks detected',
+    noMeaningfulSub:  'Only ad/tracker blocks were found — these don\'t affect the page.',
     blocksFound:      (n) => `${n} block${n !== 1 ? 's' : ''} found on this page`,
     blocksSubFound:   'Click "Open Request" to report directly to NetFree',
     blacklisted:      '🚫 Blacklisted — explicitly blocked',
@@ -45,6 +50,7 @@ const T = {
     requests:         (n) => `${n} request${n !== 1 ? 's' : ''}`,
     moreRequests:     (n) => `+ ${n} more request${n !== 1 ? 's' : ''}`,
     loading:          'Loading…',
+    harmlessHidden:   (n) => `+ ${n} ad/tracker block${n !== 1 ? 's' : ''} hidden`,
   },
 };
 
@@ -75,19 +81,25 @@ const BLOCK_META = {
 // ─────────────────────────────────────────────
 // State
 // ─────────────────────────────────────────────
-let lang       = 'he';
-let tabId      = null;
-let tabUrl     = '';
-let blocks     = [];
+let lang           = 'he';
+let tabId          = null;
+let tabUrl         = '';
+let blocks         = [];
+let showHarmless   = false;   // persisted in chrome.storage.local
 
 // ─────────────────────────────────────────────
 // Init
 // ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Restore language preference
-  const stored = await chrome.storage.local.get('lang');
-  lang = stored.lang ?? 'he';
+  // Restore persisted preferences
+  const stored = await chrome.storage.local.get(['lang', 'showHarmless']);
+  lang         = stored.lang ?? 'he';
+  showHarmless = !!stored.showHarmless;
   applyLang(lang, false);
+
+  // Sync harmless toggle state
+  const tg = document.getElementById('harmlessToggle');
+  if (tg) tg.checked = showHarmless;
 
   // Identify current tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -109,6 +121,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('langBtn').addEventListener('click', toggleLang);
   document.getElementById('reloadBtn').addEventListener('click', reloadTab);
   document.getElementById('copyAllBtn').addEventListener('click', copyAll);
+
+  const harmlessEl = document.getElementById('harmlessToggle');
+  if (harmlessEl) {
+    harmlessEl.addEventListener('change', async () => {
+      showHarmless = harmlessEl.checked;
+      await chrome.storage.local.set({ showHarmless });
+      render();
+    });
+  }
 });
 
 // ─────────────────────────────────────────────
@@ -130,11 +151,32 @@ function render() {
   const sumTl = document.getElementById('summaryTitle');
   const sumSb = document.getElementById('summarySub');
   const sumIc = document.getElementById('summaryIcon');
+  const hBar  = document.getElementById('harmlessBar');
+  const hCnt  = document.getElementById('harmlessCount');
 
-  const total = blocks.reduce((s, g) => s + g.requests.length, 0);
+  // Count both harmless and total across all groups
+  let totalAll       = 0;
+  let totalHarmless  = 0;
+  for (const g of blocks) {
+    for (const r of g.requests) {
+      totalAll++;
+      if (r.harmless) totalHarmless++;
+    }
+  }
+  const meaningful = totalAll - totalHarmless;
+
+  // Harmless bar — only visible if there are harmless blocks
+  if (hBar) {
+    if (totalHarmless > 0) {
+      hBar.style.display = '';
+      if (hCnt) hCnt.textContent = t.harmlessHidden(totalHarmless).replace(/^\+\s*/, '');
+    } else {
+      hBar.style.display = 'none';
+    }
+  }
 
   // ── Summary banner ──────────────────────────────────────
-  if (total === 0) {
+  if (totalAll === 0) {
     sum.className    = 'summary state-clean';
     sumIc.textContent = '✅';
     sumTl.textContent = t.noBlocks;
@@ -150,14 +192,41 @@ function render() {
     return;
   }
 
+  // Only harmless blocks found — green "no meaningful blocks" state
+  if (meaningful === 0 && !showHarmless) {
+    sum.className    = 'summary state-clean';
+    sumIc.textContent = '✅';
+    sumTl.textContent = t.noMeaningful;
+    sumSb.textContent = t.noMeaningfulSub;
+
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🛡️</div>
+        <div class="empty-title">${esc(t.noMeaningful)}</div>
+        <div class="empty-sub">${esc(t.noMeaningfulSub)}</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Filter requests per the toggle
+  const visibleBlocks = blocks
+    .map(g => ({
+      ...g,
+      requests: showHarmless ? g.requests : g.requests.filter(r => !r.harmless),
+    }))
+    .filter(g => g.requests.length > 0);
+
+  const shownTotal = visibleBlocks.reduce((s, g) => s + g.requests.length, 0);
+
   sum.className     = 'summary state-blocks';
   sumIc.textContent = '🔴';
-  sumTl.textContent = t.blocksFound(total);
+  sumTl.textContent = t.blocksFound(shownTotal);
   sumSb.textContent = t.blocksSubFound;
 
   // ── Block cards ─────────────────────────────────────────
   list.innerHTML = '';
-  for (const group of blocks) {
+  for (const group of visibleBlocks) {
     list.appendChild(buildCard(group, t));
   }
 }
@@ -202,10 +271,10 @@ function buildCard(group, t) {
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         ${esc(t.copyUrl)}
       </button>
-      <a class="card-action-btn ticket-btn" href="${esc(ticketUrl)}" target="_blank" rel="noopener noreferrer">
+      <button class="card-action-btn ticket-btn" data-ticket-url="${esc(ticketUrl)}" type="button">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         ${esc(t.openTicket)}
-      </a>
+      </button>
     </div>
   `;
 
@@ -222,7 +291,32 @@ function buildCard(group, t) {
     copyText(requests.map(r => r.url).join('\n'));
   });
 
+  // Ticket button — open NetFree request form in a separate Chrome popup
+  // window (a small, frameless window), not a full browser tab.
+  const ticketBtn = card.querySelector('.ticket-btn');
+  if (ticketBtn) {
+    ticketBtn.addEventListener('click', () => {
+      openTicketWindow(ticketBtn.dataset.ticketUrl);
+    });
+  }
+
   return card;
+}
+
+// Open the NetFree ticket form as a small popup window.
+// Falls back to a new tab if the windows API is unavailable (very old Chrome).
+function openTicketWindow(url) {
+  if (!url) return;
+  if (chrome.windows && chrome.windows.create) {
+    chrome.windows.create({
+      url,
+      type:   'popup',
+      width:  520,
+      height: 720,
+    });
+  } else {
+    chrome.tabs.create({ url });
+  }
 }
 
 function reqRowHtml(req) {

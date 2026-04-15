@@ -7,6 +7,9 @@
 //   'user_settings'   — blocked by the user's own personal settings (myset.avif)
 //   'unknown'         — sub-resource block; type undetectable without the block page
 
+// Load the shared harmless-domain classifier into the service-worker scope
+importScripts('harmless-domains.js');
+
 const NETFREE_HOST = 'netfree.link';
 const BLOCK_CODE   = 418;
 
@@ -41,15 +44,50 @@ async function clearTabData(tabId) {
 
 async function refreshBadge(tabId) {
   const data  = await getTabData(tabId);
-  const total = data.blocks.reduce((s, g) => s + g.requests.length, 0);
 
-  if (total > 0) {
-    chrome.action.setBadgeText({ tabId, text: String(total) });
+  // Only count NON-harmless requests for the badge & icon colour.
+  // Harmless blocks (ads, trackers) are still recorded and visible in the
+  // popup when the user toggles "show harmless", but they don't alarm.
+  const meaningful = data.blocks.reduce(
+    (s, g) => s + g.requests.filter(r => !r.harmless).length,
+    0,
+  );
+
+  if (meaningful > 0) {
+    chrome.action.setBadgeText({ tabId, text: String(meaningful) });
     chrome.action.setBadgeBackgroundColor({ tabId, color: '#EF4444' });
     try { chrome.action.setBadgeTextColor({ tabId, color: '#FFFFFF' }); } catch {}
   } else {
     chrome.action.setBadgeText({ tabId, text: '' });
   }
+
+  await refreshIcon(tabId, meaningful);
+}
+
+// ─────────────────────────────────────────────────────────
+// Dynamic icon — green when clean, red when blocks detected
+// ─────────────────────────────────────────────────────────
+
+async function refreshIcon(tabId, total) {
+  const variant = total > 0 ? 'red' : 'green';
+  try {
+    await chrome.action.setIcon({
+      tabId,
+      path: {
+        16:  `icons/icon16-${variant}.png`,
+        32:  `icons/icon32-${variant}.png`,
+        48:  `icons/icon48-${variant}.png`,
+        128: `icons/icon128-${variant}.png`,
+      },
+    });
+  } catch {
+    // Tab may have closed — ignore
+  }
+}
+
+async function resetIcon(tabId) {
+  // Called on navigation — green (clean slate)
+  await refreshIcon(tabId, 0);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -85,6 +123,7 @@ chrome.webRequest.onCompleted.addListener(
         resourceType: type,
         timestamp: timeStamp,
         initiator: initiator ?? '',
+        harmless: self.isHarmlessHost ? self.isHarmlessHost(domain) : false,
       });
 
       await setTabData(tabId, data);
@@ -129,6 +168,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return; // main frame only
   await clearTabData(details.tabId);
   try { chrome.action.setBadgeText({ tabId: details.tabId, text: '' }); } catch {}
+  await resetIcon(details.tabId);
 });
 
 // ─────────────────────────────────────────────────────────
@@ -161,6 +201,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     case 'CLEAR_BLOCKS':
       clearTabData(msg.tabId).then(async () => {
         try { chrome.action.setBadgeText({ tabId: msg.tabId, text: '' }); } catch {}
+        await resetIcon(msg.tabId);
         reply({ ok: true });
       });
       return true;
