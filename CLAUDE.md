@@ -568,6 +568,98 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 
 ---
 
+### Session 12 — 2026-04-15 (current)
+
+**Branch:** `claude/super-admin-user-control-kXlpR`
+
+**What was built (commit `11e3cd4`):**
+
+**Super Admin User Control System** — Complete role-based admin feature for managing users:
+
+1. **Database Schema (v12 migration)**:
+   - Added `role` column to `users` table: `text DEFAULT 'user' CHECK (role IN ('super_admin', 'user'))`
+   - Existing `admin` user auto-marked as `super_admin`
+   - All other users default to `user` role
+
+2. **Type Definitions**:
+   - Updated `User` interface in `lib/db.ts` to include `role: 'super_admin' | 'user'`
+
+3. **Auth System**:
+   - Updated `/api/auth/me` to return user role
+   - Added permission check helper in admin API routes to verify super_admin status
+
+4. **Admin API Routes**:
+   - `GET /api/admin/users` — List all users (name, username, role, created_at). Super admin only. Returns 403 for non-admins.
+   - `PUT /api/admin/users/[id]` — Update user:
+     - Change username (with duplicate check)
+     - Change password (optional, send empty to skip)
+     - Promote/demote role (super_admin ↔ user)
+     - Super admin only. Returns 403 for non-admins.
+
+5. **Admin UI** (`app/admin/users/page.tsx`):
+   - Full user management page (Hebrew/English bilingual, RTL support)
+   - Table with columns: Username, Display Name, Role, Actions
+   - Inline edit mode: click Edit button to modify username/password/role
+   - Role dropdown: super_admin or user
+   - Password field: optional, only changed if filled
+   - Color-coded role badges: purple for super_admin, blue for user
+   - Save/Cancel buttons in edit mode
+   - Error handling with user feedback
+   - Back button to dashboard
+   - Loading state, empty state, error state handling
+
+6. **Navigation Updates** (`app/layout.tsx`):
+   - Updated `AuthUser` type to include `role`
+   - Added "Manage Users" link to sidebar nav (visible only to super_admin)
+   - Added "Manage Users" link to user dropdown menu (visible only to super_admin)
+   - Link uses Shield icon
+   - Dynamic navigation: links only appear for super admin
+
+7. **i18n Strings** (`lib/i18n.ts`):
+   - Added Hebrew: admin, superAdmin, manageUsers, users, userRole, role, user, superAdminRole, userRole, resetPassword, newPasswordRequired, userManagement, noUsers, updateUser
+   - Added English translations for all above
+
+**Files created**:
+- `app/admin/users/page.tsx` — Super admin user management page
+- `app/api/admin/users/route.ts` — GET endpoint (list users)
+- `app/api/admin/users/[id]/route.ts` — PUT endpoint (update user)
+
+**Files modified**:
+- `lib/db.ts` — added role to User interface
+- `app/api/auth/me/route.ts` — return role in response
+- `app/api/admin/migrate/route.ts` — added v12 migration for role column
+- `app/layout.tsx` — updated AuthUser type, added admin link to nav & dropdown
+- `lib/i18n.ts` — added admin-related translation strings
+
+**How it works:**
+1. Super admin logs in (e.g., admin/admin123)
+2. Sees "Manage Users" link in sidebar and user dropdown menu
+3. Clicks link to go to `/admin/users`
+4. Page loads all users from database
+5. For each user, can click "Edit" to:
+   - Change username (with validation for duplicates)
+   - Change password (optional)
+   - Change role (promote to super_admin or demote to user)
+6. Saves changes via PUT request to `/api/admin/users/[id]`
+7. Regular users (role='user') cannot access `/admin/users` (no link shown, API returns 403)
+
+**Security:**
+- All admin endpoints check that current user is super_admin
+- Returns 403 Forbidden for non-admins
+- Username uniqueness validated
+- Password hashing uses existing PBKDF2/SHA-512 system
+- Role can only be 'super_admin' or 'user' (validated in DB constraint and API)
+
+**AFTER DEPLOY:**
+1. Run `POST /api/admin/migrate` — applies v12 migration (add role column, mark admin as super_admin)
+2. Log in as admin (admin/admin123) — will automatically be super_admin
+3. Can now manage other users via `/admin/users`
+4. Create new users or change existing users' roles/credentials as needed
+
+**Git state:** On branch `claude/super-admin-user-control-kXlpR`, pushed to origin. Ready for PR review.
+
+---
+
 ## GitHub Access
 
 - **GitHub PAT** is stored locally at `~/.github-token` (not committed to repo — blocked by GitHub secret scanning)
