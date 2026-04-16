@@ -832,4 +832,36 @@ the bundle to the new repo, that scratch branch should be deleted.
 
 ---
 
+### Session 15 — 2026-04-16 (in progress)
+
+**Branch:** `claude/add-holiday-selection-Ijij2`
+
+**User request (saved immediately per user's instruction — "save this direct to claude.md before starting to work as I see that you're getting interrupted"):**
+
+On the `/purchases` page, the week/period selector currently only lists Shabbat weeks (parashot). The user wants to also be able to select **Yom Tov days** as distinct purchase periods — each holiday day should be a separate selectable period, e.g.:
+
+- יום א פסח (first day of Pesach)
+- יום ב פסח (second day of Pesach)
+- שביעי של פסח (7th day of Pesach)
+- אחרון של פסח (8th day of Pesach — chutz la'aretz)
+- שבועות (יום א / יום ב)
+- ראש השנה (יום א / יום ב)
+- יום כיפור
+- סוכות (יום א / יום ב)
+- שמיני עצרת / שמחת תורה
+- ...and so on for every Yom Tov day in the year
+
+Each should be an independent period that members can make purchases against (like the existing parasha weeks).
+
+**Task plan:**
+1. Find the current week/period list builder (likely `lib/hebrewDate.ts` — functions `getWeekLabel` / `getShabbatOrHolidayLabel`, and the purchases page UI that iterates weeks).
+2. Extend the period generator so for each Hebrew year it emits **every Yom Tov day** as its own period (alongside Shabbatot).
+3. Each period needs: a stable key (e.g. hebcal event date), a Hebrew label (e.g. "יום א פסח"), and a date to attach purchases to.
+4. Update `/purchases` page UI to show both weeks and holiday days in the selector, sorted chronologically.
+5. Make sure purchase description_he / invoice period logic still works for the new period types (currently relies on `getWeekLabel` — either extend it or branch in the purchases page).
+
+**Git state:** On branch `claude/add-holiday-selection-Ijij2`, just created. Work in progress.
+
+---
+
 *This file is updated at the end of every session. Always read it at the start of a new session to restore context.*
