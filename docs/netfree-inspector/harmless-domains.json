@@ -1,0 +1,66 @@
+{
+  "_comment": "NetFree Inspector — remote harmless-domain list. The extension fetches this JSON once per day and merges with its bundled fallback. Updating this file (via git push to main) propagates to all installed extensions within 24 hours — no Chrome Web Store release needed.",
+  "version": 1,
+  "updated": "2026-04-15",
+  "domains": [
+    "doubleclick.net",
+    "googlesyndication.com",
+    "googletagmanager.com",
+    "googletagservices.com",
+    "google-analytics.com",
+    "googleadservices.com",
+    "adservice.google.com",
+    "adsystem.google.com",
+    "pagead2.googlesyndication.com",
+
+    "facebook.net",
+    "connect.facebook.net",
+
+    "ads-twitter.com",
+    "analytics.twitter.com",
+
+    "analytics.tiktok.com",
+    "sc-static.net",
+    "ct.pinterest.com",
+
+    "hotjar.com",
+    "mouseflow.com",
+    "fullstory.com",
+    "mixpanel.com",
+    "segment.io",
+    "segment.com",
+    "amplitude.com",
+    "heap.io",
+    "heapanalytics.com",
+    "clarity.ms",
+    "bat.bing.com",
+
+    "adsrvr.org",
+    "adnxs.com",
+    "rubiconproject.com",
+    "pubmatic.com",
+    "openx.net",
+    "criteo.com",
+    "criteo.net",
+    "taboola.com",
+    "outbrain.com",
+    "moatads.com",
+    "scorecardresearch.com",
+    "quantserve.com",
+    "quantcount.com",
+    "adform.net",
+
+    "onetrust.com",
+    "cookielaw.org",
+    "cookiebot.com",
+    "trustarc.com",
+
+    "sentry.io",
+    "bugsnag.com",
+    "newrelic.com",
+    "nr-data.net",
+    "datadoghq.com",
+    "logrocket.com",
+    "rollbar.com"
+  ]
+}
