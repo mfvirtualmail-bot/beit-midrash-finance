@@ -13,6 +13,22 @@ It contains project context, architecture notes, and a running log of all develo
 **Database:** Supabase (PostgreSQL)
 **Repo:** mfvirtualmail-bot/beit-midrash-finance
 
+> ### ⚠️ NetFree Inspector extension has MOVED
+>
+> The Chrome extension that used to live at `chrome-extension/` is now its own
+> repo: **`mfvirtualmail-bot/netfree-inspector`**. Do not reintroduce extension
+> source here. See Session 14 log entry for details.
+>
+> **Intentionally retained in this repo** (do **not** delete — they back live URLs):
+> - `docs/netfree-inspector/` — served via GitHub Pages at
+>   `https://mfvirtualmail-bot.github.io/beit-midrash-finance/netfree-inspector/`;
+>   `harmless-domains.json` is fetched daily by every deployed extension (v1.3.0+).
+> - `chrome-extension-store/privacy-policy.md` — the exact URL referenced in the
+>   Chrome Web Store listing's privacy-policy field.
+>
+> These files stay here until a future Chrome Web Store release republishes
+> them from the new repo; removing them earlier would break installed users.
+
 ---
 
 ## Tech Stack
@@ -777,6 +793,42 @@ https://github.com/mfvirtualmail-bot/beit-midrash-finance/compare/main...claude/
 ```
 
 **Git state:** On branch `claude/new-chrome-extension-pGE68`, pushed to origin. Awaiting manual PR merge to main.
+
+---
+
+### Session 14 — 2026-04-16
+
+**Branch:** `claude/extract-chrome-extension-gMLsc`
+
+**What was done:** Extracted the NetFree Inspector Chrome extension into its
+own GitHub repository at **`mfvirtualmail-bot/netfree-inspector`**.
+
+**Extracted from this repo:**
+- `chrome-extension/` — extension source (deleted in this PR)
+
+**Intentionally NOT extracted (retained here — see banner at top of this file):**
+- `docs/netfree-inspector/` — the deployed extension's daily `harmless-domains.json`
+  fetch target (GitHub Pages of *this* repo). Removing would break every
+  installed v1.3.0+ copy within 24h.
+- `chrome-extension-store/` — the published Chrome Web Store privacy-policy URL
+  points into this folder. Removing would 404 the privacy policy referenced in
+  the live listing.
+
+The new repo was seeded with the 6 commits from this repo that had touched
+`chrome-extension*/` paths, preserved via `git filter-repo`, plus one
+restructure commit that moved the source to the new repo's root and the store
+kit under `store/`. Because the Claude sandbox's proxy+signing allowlist only
+covered this repo, the extracted history was transferred via a git bundle
+checked in on a scratch branch (`tmp/netfree-inspector-bundle-DELETE-ME`) with
+`BUNDLE-README.md` explaining the transfer steps. Once the user has pushed
+the bundle to the new repo, that scratch branch should be deleted.
+
+**Files touched in beit-midrash-finance (this PR):**
+- Deleted: `chrome-extension/` (entire folder)
+- Modified: `CLAUDE.md` — added prominent banner that the extension has moved
+  and explaining why `docs/` + `chrome-extension-store/` intentionally remain
+
+**Git state:** On branch `claude/extract-chrome-extension-gMLsc`, pushed to origin.
 
 ---
 
