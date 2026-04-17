@@ -41,6 +41,18 @@ UPDATE member_payments SET method = 'unknown' WHERE method IS NULL OR method = '
 -- v9: Change default from 'cash' to 'unknown' and clean up any remaining 'cash' entries
 ALTER TABLE member_payments ALTER COLUMN method SET DEFAULT 'unknown';
 UPDATE member_payments SET method = 'unknown' WHERE method = 'cash';
+
+-- v10: Label overrides — user-editable renames for parasha/holiday/period names
+CREATE TABLE IF NOT EXISTS label_overrides (
+  id bigint primary key generated always as identity,
+  original_text text not null unique,
+  replacement_text text not null,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+ALTER TABLE label_overrides DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_label_overrides_original ON label_overrides(original_text);
 `
 
 export async function POST() {

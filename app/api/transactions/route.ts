@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { applyLabelOverrides } from '@/lib/hebrewDate'
+import { fetchLabelOverrides } from '@/lib/labelOverrides'
 
 function flattenTx(t: Record<string, unknown>) {
   const cat = t.categories as Record<string, string> | null
@@ -76,6 +78,15 @@ export async function GET(req: NextRequest) {
 
       // Re-sort combined list by date descending
       transactions.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    }
+
+    // Apply user label renames to description fields (doesn't mutate DB)
+    const overrides = await fetchLabelOverrides()
+    if (overrides.length > 0) {
+      for (const t of transactions) {
+        if (t.description_he) t.description_he = applyLabelOverrides(t.description_he, overrides)
+        if (t.description_en) t.description_en = applyLabelOverrides(t.description_en, overrides)
+      }
     }
 
     return NextResponse.json(transactions)

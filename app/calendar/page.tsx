@@ -1,9 +1,9 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useLang } from '@/lib/LangContext'
 import { HDate, HebrewCalendar, months, flags } from '@hebcal/core'
 import type { CalOptions } from '@hebcal/core'
-import { MONTH_HE, MONTH_EN, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getShabbatOrHolidayLabel, stripNikud } from '@/lib/hebrewDate'
+import { MONTH_HE, MONTH_EN, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getShabbatOrHolidayLabel, stripNikud, applyLabelOverrides, LabelOverride } from '@/lib/hebrewDate'
 import { Calendar as CalIcon, ChevronLeft, ChevronRight, ShoppingCart, Star, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 
@@ -202,8 +202,36 @@ export default function CalendarPage() {
 
   const monthsInYear = useMemo(() => getHebrewMonthsInYear(hebrewYear), [hebrewYear])
   const currentMonthInfo = monthsInYear.find(m => m.month === hebrewMonth)
-  const weeks = useMemo(() => getWeeksForHebrewMonth(hebrewMonth, hebrewYear), [hebrewMonth, hebrewYear])
-  const upcomingHolidays = useMemo(() => getUpcomingHolidays(10), [])
+  const weeksRaw = useMemo(() => getWeeksForHebrewMonth(hebrewMonth, hebrewYear), [hebrewMonth, hebrewYear])
+  const upcomingRaw = useMemo(() => getUpcomingHolidays(10), [])
+
+  const [labelOverrides, setLabelOverrides] = useState<LabelOverride[]>([])
+  useEffect(() => {
+    fetch('/api/labels').then(r => r.json()).then(d => Array.isArray(d) && setLabelOverrides(d)).catch(() => {})
+  }, [])
+
+  const weeks = useMemo(() => {
+    if (labelOverrides.length === 0) return weeksRaw
+    return weeksRaw.map(w => ({
+      ...w,
+      parashaHe: applyLabelOverrides(w.parashaHe, labelOverrides),
+      parashaEn: applyLabelOverrides(w.parashaEn, labelOverrides),
+      holidays: w.holidays.map(h => ({
+        ...h,
+        name: applyLabelOverrides(h.name, labelOverrides),
+        nameEn: applyLabelOverrides(h.nameEn, labelOverrides),
+      })),
+    }))
+  }, [weeksRaw, labelOverrides])
+
+  const upcomingHolidays = useMemo(() => {
+    if (labelOverrides.length === 0) return upcomingRaw
+    return upcomingRaw.map(h => ({
+      ...h,
+      name: applyLabelOverrides(h.name, labelOverrides),
+      nameEn: applyLabelOverrides(h.nameEn, labelOverrides),
+    }))
+  }, [upcomingRaw, labelOverrides])
   // Calendar always displays in Hebrew regardless of app language
   const dayNames = DAY_NAMES_HE
 
