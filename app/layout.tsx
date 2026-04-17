@@ -2,7 +2,7 @@
 import './globals.css'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User, Calendar, UserCheck, Banknote, Contact, Shield } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User, Calendar, UserCheck, Banknote, Contact, Edit3, Shield } from 'lucide-react'
 import { LangProvider, useLang } from '@/lib/LangContext'
 import { useState, useEffect } from 'react'
 
@@ -49,6 +49,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: '/collectors', label: T.collectors, icon: UserCheck },
     { href: '/invoices', label: T.invoices, icon: FileText },
     { href: '/categories', label: T.categories, icon: Tag },
+    { href: '/labels', label: T.labels, icon: Edit3 },
     { href: '/reports', label: T.reports, icon: BarChart2 },
     { href: '/settings', label: T.settings, icon: Settings },
     ...(user?.role === 'super_admin' ? [{ href: '/admin/users', label: lang === 'he' ? 'ניהול משתמשים' : 'Manage Users', icon: Shield }] : []),

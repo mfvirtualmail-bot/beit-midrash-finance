@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { applyLabelOverrides } from '@/lib/hebrewDate'
+import { fetchLabelOverrides } from '@/lib/labelOverrides'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -23,9 +25,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
     const flatCharges = (charges ?? []).map(c => ({ ...c, created_by_name: (c.users as {display_name:string}|null)?.display_name ?? null, users: undefined }))
     const flatPayments = (payments ?? []).map(p => ({ ...p, created_by_name: (p.users as {display_name:string}|null)?.display_name ?? null, users: undefined }))
+    const overrides = await fetchLabelOverrides()
     const flatPurchases = (purchases ?? []).map(p => ({
       id: p.id, date: p.date, amount: Number(p.amount), type: p.type,
-      description: p.description_he || (p.categories as {name_he:string}|null)?.name_he || '',
+      description: applyLabelOverrides(p.description_he || (p.categories as {name_he:string}|null)?.name_he || '', overrides),
       category_name: (p.categories as {name_he:string}|null)?.name_he || '',
       notes: p.notes,
     }))

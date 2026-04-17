@@ -221,3 +221,15 @@ alter table collectors enable row level security;
 
 -- v3: Add collector_id to donor_donations
 ALTER TABLE donor_donations ADD COLUMN IF NOT EXISTS collector_id bigint REFERENCES collectors(id) ON DELETE SET NULL;
+
+-- v10: Label overrides — let users rename hebcal-generated parasha/holiday labels
+create table if not exists label_overrides (
+  id bigint primary key generated always as identity,
+  original_text text not null unique,
+  replacement_text text not null,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table label_overrides disable row level security;
+create index if not exists idx_label_overrides_original on label_overrides(original_text);

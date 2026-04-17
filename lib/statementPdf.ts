@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
-import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from './hebrewDate'
+import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex, applyLabelOverrides } from './hebrewDate'
+import { fetchLabelOverrides } from './labelOverrides'
 
 export interface StatementMemberData {
   member: { id: number; name: string; phone?: string; email?: string; address?: string }
@@ -100,6 +101,13 @@ export async function buildMemberStatementData(
     if (idxA !== idxB) return idxA - idxB
     return a.date.localeCompare(b.date)
   })
+
+  // Apply user-defined label renames (display-time substitution, doesn't touch DB)
+  const overrides = await fetchLabelOverrides()
+  for (const l of lines) {
+    l.period = applyLabelOverrides(l.period, overrides)
+    l.description = applyLabelOverrides(l.description, overrides)
+  }
 
   const totalCharged = lines.reduce((s, l) => s + l.charge, 0)
   const totalPaid = lines.reduce((s, l) => s + l.payment, 0)

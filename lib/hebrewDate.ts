@@ -520,3 +520,24 @@ export function getPaymentSortIndex(gregorianDate: string): number {
 }
 
 export { MONTH_HE, MONTH_EN, MONTH_ORDER }
+
+// === Label overrides ===
+// Users can rename parasha/holiday/period labels via /labels.
+// Overrides are applied as substring replacement at display time, so existing
+// purchase descriptions (e.g. "פרשת ויקהלפקודי - כהן") get renamed automatically
+// without mutating the DB records.
+export type LabelOverride = { original_text: string; replacement_text: string }
+
+export function applyLabelOverrides(text: string | null | undefined, overrides: LabelOverride[] | null | undefined): string {
+  if (!text) return text ?? ''
+  if (!overrides || overrides.length === 0) return text
+  // Sort longest-original-first so longer matches take priority over substrings.
+  const sorted = [...overrides].sort((a, b) => b.original_text.length - a.original_text.length)
+  let out = text
+  for (const o of sorted) {
+    if (!o.original_text) continue
+    // Global replace without regex (originals may contain special chars)
+    out = out.split(o.original_text).join(o.replacement_text)
+  }
+  return out
+}

@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
 import { Category, Member } from '@/lib/db'
 import { HDate } from '@hebcal/core'
-import { getMonthNameHe, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getHolidayPeriodsForMonth } from '@/lib/hebrewDate'
+import { getMonthNameHe, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getHolidayPeriodsForMonth, applyLabelOverrides, LabelOverride } from '@/lib/hebrewDate'
 import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Settings, Edit2, Calendar, Upload, Pencil, X } from 'lucide-react'
 import Link from 'next/link'
 
@@ -182,7 +182,20 @@ function PurchasesPageInner() {
   const monthsInYear = getHebrewMonthsInYear(hebrewYear)
   const currentMonthInfo = monthsInYear.find(m => m.month === hebrewMonth)
 
-  const weeks = getPeriodsForMonth(hebrewMonth, hebrewYear, lang as 'he' | 'en')
+  const [labelOverrides, setLabelOverrides] = useState<LabelOverride[]>([])
+  useEffect(() => {
+    fetch('/api/labels').then(r => r.json()).then(d => Array.isArray(d) && setLabelOverrides(d)).catch(() => {})
+  }, [])
+
+  const weeksRaw = getPeriodsForMonth(hebrewMonth, hebrewYear, lang as 'he' | 'en')
+  const weeks = labelOverrides.length > 0
+    ? weeksRaw.map(w => ({
+        ...w,
+        label: applyLabelOverrides(w.label, labelOverrides),
+        shabbatLabel: applyLabelOverrides(w.shabbatLabel, labelOverrides),
+        shabbatLabelEn: applyLabelOverrides(w.shabbatLabelEn, labelOverrides),
+      }))
+    : weeksRaw
   // Each period has a unique id `${kind}|${dateStr}` so a holiday that falls on
   // a week-Sunday can still be selected independently from that week.
   const periodId = (p: Period) => `${p.kind}|${p.dateStr}`

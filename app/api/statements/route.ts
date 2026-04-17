@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex, applyLabelOverrides } from '@/lib/hebrewDate'
+import { fetchLabelOverrides } from '@/lib/labelOverrides'
 
 // GET /api/statements?member_id=1 or ?member_ids=1,2,3
 // Returns unified financial data: charges, payments, purchases, balance per member
@@ -35,6 +36,8 @@ export async function GET(req: NextRequest) {
       check: "צ'ק",
       credit_card: 'כרטיס אשראי',
     }
+
+    const labelOverrides = await fetchLabelOverrides()
 
     const results = []
 
@@ -164,7 +167,8 @@ export async function GET(req: NextRequest) {
         })
       }
 
-      // Sort by Hebrew calendar order (Tishrei → Elul), not by Gregorian date
+      // Sort by Hebrew calendar order (Tishrei → Elul), not by Gregorian date.
+      // Sort BEFORE applying overrides so sorting uses the canonical hebcal labels.
       lines.sort((a, b) => {
         const idxA = a.lineType === 'payment' ? getPaymentSortIndex(a.date) : getHebrewPeriodSortIndex(a.period)
         const idxB = b.lineType === 'payment' ? getPaymentSortIndex(b.date) : getHebrewPeriodSortIndex(b.period)
@@ -172,6 +176,12 @@ export async function GET(req: NextRequest) {
         // Same index: sub-sort by Gregorian date
         return a.date.localeCompare(b.date)
       })
+
+      // Apply user-defined label renames to display fields (period + description).
+      for (const l of lines) {
+        l.period = applyLabelOverrides(l.period, labelOverrides)
+        l.description = applyLabelOverrides(l.description, labelOverrides)
+      }
 
       const totalCharged = lines.reduce((s, l) => s + l.charge, 0)
       const totalPaid = lines.reduce((s, l) => s + l.payment, 0)

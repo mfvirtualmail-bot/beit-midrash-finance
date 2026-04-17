@@ -73,6 +73,18 @@ ALTER TABLE collectors ENABLE ROW LEVEL SECURITY;
 -- v12: Add role column to users table for super admin control
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role text DEFAULT 'user' CHECK (role IN ('super_admin', 'user'));
 UPDATE users SET role = 'super_admin' WHERE username = 'admin';
+
+-- v13: Label overrides — user-editable renames for parasha/holiday/period names
+CREATE TABLE IF NOT EXISTS label_overrides (
+  id bigint primary key generated always as identity,
+  original_text text not null unique,
+  replacement_text text not null,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+ALTER TABLE label_overrides DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_label_overrides_original ON label_overrides(original_text);
 `
 
 export async function POST() {
