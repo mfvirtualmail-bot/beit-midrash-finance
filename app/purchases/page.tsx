@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
 import { Category, Member } from '@/lib/db'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE, MONTH_EN, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange, applyLabelOverrides, LabelOverride } from '@/lib/hebrewDate'
+import { getMonthNameHe, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getHolidayPeriodsForMonth, applyLabelOverrides, LabelOverride } from '@/lib/hebrewDate'
 import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Settings, Edit2, Calendar, Upload, Pencil, X } from 'lucide-react'
 import Link from 'next/link'
 
@@ -28,7 +28,22 @@ function getHebrewWeekStart(date: Date): Date {
   return sunday
 }
 
-function getWeeksForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 'en' = 'he'): Array<{ label: string; dateStr: string; shabbatLabel: string; shabbatLabelEn: string }> {
+interface Period {
+  kind: 'week' | 'holiday'
+  label: string
+  dateStr: string
+  shabbatLabel: string     // Hebrew period label used in purchase description
+  shabbatLabelEn: string   // English period label
+}
+
+function formatGregISO(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function getPeriodsForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 'en' = 'he'): Period[] {
   const range = hebrewMonthToGregorianRange(hebrewMonth, hebrewYear)
   const startDate = new Date(range.start)
   const endDate = new Date(range.end)
@@ -37,9 +52,10 @@ function getWeeksForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 
   const lastSat = new Date(lastDate)
   lastSat.setDate(lastDate.getDate() + (6 - lastDate.getDay()))
 
-  const weeks: Array<{ label: string; dateStr: string; shabbatLabel: string; shabbatLabelEn: string }> = []
+  const periods: Period[] = []
   const current = new Date(firstSunday)
 
+  // --- Weekly periods (Sunday → Saturday) ---
   while (current <= lastSat) {
     const sunday = new Date(current)
     const saturday = new Date(sunday)
@@ -47,18 +63,19 @@ function getWeeksForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 
     const hdSun = new HDate(sunday)
     const hdSat = new HDate(saturday)
     const hebrewSunDay = hdSun.getDate()
-    const hebrewSunMonth = MONTH_HE[hdSun.getMonth()] ?? ''
+    const hebrewSunMonth = getMonthNameHe(hdSun.getMonth(), hdSun.getFullYear())
     const hebrewSatDay = hdSat.getDate()
-    const hebrewSatMonth = MONTH_HE[hdSat.getMonth()] ?? ''
+    const hebrewSatMonth = getMonthNameHe(hdSat.getMonth(), hdSat.getFullYear())
     const sameMonth = hdSun.getMonth() === hdSat.getMonth()
     const hebrewLabel = sameMonth
       ? `${hebrewSunDay}–${hebrewSatDay} ${hebrewSunMonth}`
       : `${hebrewSunDay} ${hebrewSunMonth} – ${hebrewSatDay} ${hebrewSatMonth}`
     const greg = `${sunday.toLocaleDateString('en-GB')} – ${saturday.toLocaleDateString('en-GB')}`
-    const sundayStr = sunday.toISOString().split('T')[0]
+    const sundayStr = formatGregISO(sunday)
     const shabbatLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
     const shabbatLabelEn = getShabbatOrHolidayLabel(sundayStr, 'en')
-    weeks.push({
+    periods.push({
+      kind: 'week',
       label: `${shabbatLabel ? shabbatLabel + ' | ' : ''}${hebrewLabel}  (${greg})`,
       dateStr: sundayStr,
       shabbatLabel,
@@ -67,7 +84,36 @@ function getWeeksForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 
     current.setDate(current.getDate() + 7)
   }
 
-  return weeks
+  // --- Holiday periods (one entry per Yom Tov / chol hamoed / chanukah / etc. day) ---
+  const holidays = getHolidayPeriodsForMonth(hebrewMonth, hebrewYear)
+  for (const h of holidays) {
+    const [y, m, d] = h.dateStr.split('-').map(Number)
+    const jsDate = new Date(y, m - 1, d)
+    const hd = new HDate(jsDate)
+    const hebDay = hd.getDate()
+    const hebMonthName = getMonthNameHe(hd.getMonth(), hd.getFullYear())
+    const hebLabel = `${hebDay} ${hebMonthName}`
+    const greg = jsDate.toLocaleDateString('en-GB')
+    const name = lang === 'he' ? h.nameHe : h.nameEn
+    periods.push({
+      kind: 'holiday',
+      label: `🎉 ${name} | ${hebLabel}  (${greg})`,
+      dateStr: h.dateStr,
+      shabbatLabel: h.nameHe,
+      shabbatLabelEn: h.nameEn,
+    })
+  }
+
+  // Sort chronologically so weeks and holidays interleave correctly.
+  // Tie-break: weeks before holidays on the same day (a week starting Sunday
+  // and a holiday on that same Sunday are unlikely but the ordering is stable).
+  periods.sort((a, b) => {
+    if (a.dateStr !== b.dateStr) return a.dateStr.localeCompare(b.dateStr)
+    if (a.kind === b.kind) return 0
+    return a.kind === 'week' ? -1 : 1
+  })
+
+  return periods
 }
 
 function MemberSelect({ members, value, onChange, placeholder }: {
@@ -141,7 +187,7 @@ function PurchasesPageInner() {
     fetch('/api/labels').then(r => r.json()).then(d => Array.isArray(d) && setLabelOverrides(d)).catch(() => {})
   }, [])
 
-  const weeksRaw = getWeeksForMonth(hebrewMonth, hebrewYear, lang as 'he' | 'en')
+  const weeksRaw = getPeriodsForMonth(hebrewMonth, hebrewYear, lang as 'he' | 'en')
   const weeks = labelOverrides.length > 0
     ? weeksRaw.map(w => ({
         ...w,
@@ -150,12 +196,25 @@ function PurchasesPageInner() {
         shabbatLabelEn: applyLabelOverrides(w.shabbatLabelEn, labelOverrides),
       }))
     : weeksRaw
-  const initialWeek = searchParams?.get('week') ?? weeks[0]?.dateStr ?? ''
+  // Each period has a unique id `${kind}|${dateStr}` so a holiday that falls on
+  // a week-Sunday can still be selected independently from that week.
+  const periodId = (p: Period) => `${p.kind}|${p.dateStr}`
+  const queryWeek = searchParams?.get('week')
+  // Accept either a bare YYYY-MM-DD (legacy ?week= links) or a composite id.
+  const initialWeek = (() => {
+    if (!queryWeek) return weeks[0] ? periodId(weeks[0]) : ''
+    if (queryWeek.includes('|')) return queryWeek
+    const match = weeks.find(w => w.dateStr === queryWeek)
+    return match ? periodId(match) : (weeks[0] ? periodId(weeks[0]) : '')
+  })()
   const [weekDate, setWeekDate] = useState(initialWeek)
 
-  // If weekDate is not in current month's weeks, select the first one
-  const weekInList = weeks.find(w => w.dateStr === weekDate)
-  const effectiveWeekDate = weekInList ? weekDate : (weeks[0]?.dateStr ?? '')
+  const weekInList = weeks.find(w => periodId(w) === weekDate)
+  const effectivePeriodId = weekInList ? weekDate : (weeks[0] ? periodId(weeks[0]) : '')
+  const effectiveWeekDate = weekInList ? weekInList.dateStr : (weeks[0]?.dateStr ?? '')
+  const selectedWeek = weekInList ?? weeks[0]
+  const shabbatLabel = selectedWeek?.shabbatLabel ?? ''
+  const effectiveKind: 'week' | 'holiday' = selectedWeek?.kind ?? 'week'
 
   function navigateMonth(dir: -1 | 1) {
     const idx = monthsInYear.findIndex(m => m.month === hebrewMonth)
@@ -192,30 +251,31 @@ function PurchasesPageInner() {
   const [deletePurchaseId, setDeletePurchaseId] = useState<number | null>(null)
   const [editSaving, setEditSaving] = useState(false)
 
-  async function loadExistingPurchases(weekStr: string) {
+  async function loadExistingPurchases(weekStr: string, kind: 'week' | 'holiday') {
     if (!weekStr) return
     setLoadingPurchases(true)
     try {
-      // Get the Saturday of the week
-      const [y, m, d] = weekStr.split('-').map(Number)
-      const sunday = new Date(y, m - 1, d)
-      const saturday = new Date(sunday)
-      saturday.setDate(sunday.getDate() + 6)
-      const satStr = saturday.toISOString().split('T')[0]
-
-      const res = await fetch(`/api/transactions?type=expense&limit=500`)
+      let startStr = weekStr
+      let endStr = weekStr
+      if (kind === 'week') {
+        const [y, m, d] = weekStr.split('-').map(Number)
+        const sunday = new Date(y, m - 1, d)
+        const saturday = new Date(sunday)
+        saturday.setDate(sunday.getDate() + 6)
+        endStr = formatGregISO(saturday)
+      }
+      const res = await fetch(`/api/transactions?type=purchase&limit=500`)
       const data = await res.json()
-      // Filter to purchases in this week
-      const weekPurchases = (data as ExistingPurchase[]).filter((tx: ExistingPurchase) =>
-        tx.date >= weekStr && tx.date <= satStr && tx.member_id
+      const periodPurchases = (data as ExistingPurchase[]).filter((tx: ExistingPurchase) =>
+        tx.date >= startStr && tx.date <= endStr && tx.member_id
       )
-      setExistingPurchases(weekPurchases)
+      setExistingPurchases(periodPurchases)
     } catch { setExistingPurchases([]) }
     setLoadingPurchases(false)
   }
 
-  // Load existing purchases when week changes
-  useEffect(() => { if (effectiveWeekDate) loadExistingPurchases(effectiveWeekDate) }, [effectiveWeekDate])
+  // Load existing purchases when the selected period changes
+  useEffect(() => { if (effectiveWeekDate) loadExistingPurchases(effectiveWeekDate, effectiveKind) }, [effectiveWeekDate, effectiveKind])
 
   function openEditPurchase(p: ExistingPurchase) {
     setEditPurchase(p)
@@ -229,7 +289,7 @@ function PurchasesPageInner() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'expense',
+        type: 'purchase',
         amount: Number(editForm.amount),
         description_he: editPurchase.description_he,
         description_en: null,
@@ -240,13 +300,13 @@ function PurchasesPageInner() {
     })
     setEditSaving(false)
     setEditPurchase(null)
-    loadExistingPurchases(effectiveWeekDate)
+    loadExistingPurchases(effectiveWeekDate, effectiveKind)
   }
 
   async function handleDeletePurchase(id: number) {
     await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
     setDeletePurchaseId(null)
-    loadExistingPurchases(effectiveWeekDate)
+    loadExistingPurchases(effectiveWeekDate, effectiveKind)
   }
 
   async function loadCategories() {
@@ -268,8 +328,6 @@ function PurchasesPageInner() {
   function addRow() { setRows(prev => [...prev, newRow()]) }
   function removeRow(id: string) { setRows(prev => prev.filter(r => r.id !== id)) }
 
-  const selectedWeek = weeks.find(w => w.dateStr === effectiveWeekDate)
-  const shabbatLabel = selectedWeek?.shabbatLabel ?? ''
 
   async function handleSave() {
     const valid = rows.filter(r => r.category_id && r.amount && Number(r.amount) > 0)
@@ -283,7 +341,7 @@ function PurchasesPageInner() {
         ? `${memberName}${r.notes ? ' - ' + r.notes : ''}`
         : r.notes || null
       return {
-        type: 'expense',
+        type: 'purchase',
         amount: Number(r.amount),
         description_he: descHe,
         description_en: null,
@@ -300,7 +358,7 @@ function PurchasesPageInner() {
     setSavedCount(valid.length)
     setRows([newRow(), newRow(), newRow()])
     setTimeout(() => setSavedCount(null), 4000)
-    loadExistingPurchases(effectiveWeekDate)
+    loadExistingPurchases(effectiveWeekDate, effectiveKind)
   }
 
   function openAddType() {
@@ -394,9 +452,9 @@ function PurchasesPageInner() {
             <label className="label text-base font-semibold">
               {lang === 'he' ? 'בחר שבוע / חג' : 'Select Week / Holiday'}
             </label>
-            <select className="input w-full max-w-xl text-sm" dir="rtl" value={effectiveWeekDate} onChange={e => setWeekDate(e.target.value)}>
+            <select className="input w-full max-w-xl text-sm" dir="rtl" value={effectivePeriodId} onChange={e => setWeekDate(e.target.value)}>
               {weeks.map(w => (
-                <option key={w.dateStr} value={w.dateStr}>{w.label}</option>
+                <option key={periodId(w)} value={periodId(w)}>{w.label}</option>
               ))}
             </select>
           </div>

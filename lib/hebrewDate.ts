@@ -55,6 +55,25 @@ const MONTH_EN: Record<number, string> = {
   [months.ELUL]: 'Elul',
 }
 
+/**
+ * Get the correct Hebrew month name, taking leap years into account.
+ * In a non-leap year, ADAR_I is just "אדר" (not "אדר א׳").
+ * In a leap year, ADAR_I = "אדר א׳", ADAR_II = "אדר ב׳".
+ */
+export function getMonthNameHe(monthNum: number, hebrewYear: number): string {
+  if (monthNum === months.ADAR_I && !HDate.isLeapYear(hebrewYear)) {
+    return 'אדר'
+  }
+  return MONTH_HE[monthNum] ?? ''
+}
+
+export function getMonthNameEn(monthNum: number, hebrewYear: number): string {
+  if (monthNum === months.ADAR_I && !HDate.isLeapYear(hebrewYear)) {
+    return 'Adar'
+  }
+  return MONTH_EN[monthNum] ?? ''
+}
+
 const HEBREW_DIGITS: Record<number, string> = {
   1:'א', 2:'ב', 3:'ג', 4:'ד', 5:'ה', 6:'ו', 7:'ז', 8:'ח', 9:'ט',
   10:'י', 11:'יא', 12:'יב', 13:'יג', 14:'יד', 15:'טו', 16:'טז',
@@ -117,11 +136,12 @@ export function formatHebrewDate(gregorianDateStr: string, lang: 'he' | 'en' = '
     const hd = toHDate(gregorianDateStr)
     const day = HEBREW_DIGITS[hd.getDate()] ?? String(hd.getDate())
     const monthNum = hd.getMonth()
-    const yearStr = yearToGematriya(hd.getFullYear())
+    const hebrewYear = hd.getFullYear()
+    const yearStr = yearToGematriya(hebrewYear)
     if (lang === 'he') {
-      return `${day} ${MONTH_HE[monthNum] ?? ''} ${yearStr}`
+      return `${day} ${getMonthNameHe(monthNum, hebrewYear)} ${yearStr}`
     }
-    return `${hd.getDate()} ${MONTH_EN[monthNum] ?? ''} ${hd.getFullYear()}`
+    return `${hd.getDate()} ${getMonthNameEn(monthNum, hebrewYear)} ${hebrewYear}`
   } catch {
     return gregorianDateStr
   }
@@ -135,11 +155,12 @@ export function getCurrentHebrewYear(): number {
 // Get Hebrew month and year for a given gregorian YYYY-MM string
 export function getHebrewMonthYear(gregorianDateStr: string): { month: number; year: number; monthHe: string; monthEn: string } {
   const hd = toHDate(gregorianDateStr + '-01')
+  const hebrewYear = hd.getFullYear()
   return {
     month: hd.getMonth(),
-    year: hd.getFullYear(),
-    monthHe: MONTH_HE[hd.getMonth()] ?? '',
-    monthEn: MONTH_EN[hd.getMonth()] ?? '',
+    year: hebrewYear,
+    monthHe: getMonthNameHe(hd.getMonth(), hebrewYear),
+    monthEn: getMonthNameEn(hd.getMonth(), hebrewYear),
   }
 }
 
@@ -148,11 +169,12 @@ export function getHebrewMonthsInYear(hebrewYear: number): Array<{ month: number
   const isLeap = HDate.isLeapYear(hebrewYear)
   return MONTH_ORDER
     .filter(m => {
-      if (m === months.ADAR_I) return isLeap
+      // In non-leap year: include ADAR_I (as plain Adar), exclude ADAR_II
+      // In leap year: include both ADAR_I and ADAR_II
       if (m === months.ADAR_II) return isLeap
       return true
     })
-    .map(m => ({ month: m, nameHe: MONTH_HE[m] ?? '', nameEn: MONTH_EN[m] ?? '' }))
+    .map(m => ({ month: m, nameHe: getMonthNameHe(m, hebrewYear), nameEn: getMonthNameEn(m, hebrewYear) }))
 }
 
 // Get the Gregorian date range for a Hebrew month/year
@@ -210,6 +232,86 @@ export function getShabbatOrHolidayLabel(sundayDateStr: string, lang: 'he' | 'en
   }
 }
 
+// A single holiday day that can be used as a purchase period.
+export interface HolidayPeriod {
+  dateStr: string   // YYYY-MM-DD (gregorian date of that holiday day)
+  nameHe: string    // e.g. "פסח א׳" (nikud stripped)
+  nameEn: string    // e.g. "Pesach I"
+}
+
+/**
+ * Get every individual Yom Tov / major holiday day whose gregorian date falls
+ * inside the gregorian range of the given Hebrew month.
+ *
+ * Each holiday day is a separate entry (e.g. Pesach day 1, day 2, chol hamoed
+ * days, 7th day, 8th day are all separate). Uses diaspora observance
+ * (il: false) so that chutz-la'aretz-only days (יום ב פסח, אחרון של פסח,
+ * יום ב שבועות, שמחת תורה) are included.
+ */
+export function getHolidayPeriodsForMonth(hebrewMonth: number, hebrewYear: number): HolidayPeriod[] {
+  try {
+    const range = hebrewMonthToGregorianRange(hebrewMonth, hebrewYear)
+    const [sy, sm, sd] = range.start.split('-').map(Number)
+    const [ey, em, ed] = range.end.split('-').map(Number)
+    const start = new Date(sy, sm - 1, sd)
+    const end = new Date(ey, em - 1, ed)
+
+    const events = HebrewCalendar.calendar({
+      start, end,
+      sedrot: false,
+      il: false,
+      noHolidays: false,
+    } as CalOptions)
+
+    const fmt = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+
+    // Include: Yom Tov, Chol HaMoed, major fasts, minor holidays, Chanukah.
+    // Exclude: Rosh Chodesh, candle-lighting-only markers, havdalah, parasha.
+    // Flag names taken from @hebcal/core's `flags` enum.
+    const fAny = flags as unknown as Record<string, number>
+    const INCLUDE_MASK =
+      (fAny.CHAG ?? 0) |
+      (fAny.CHOL_HAMOED ?? 0) |
+      (fAny.MAJOR_FAST ?? 0) |
+      (fAny.MINOR_HOLIDAY ?? 0) |
+      (fAny.CHANUKAH_CANDLES ?? 0)
+    const EREV_FLAG = fAny.EREV ?? 0
+
+    const seen = new Set<string>()
+    const results: HolidayPeriod[] = []
+
+    for (const e of events) {
+      const f = e.getFlags()
+      if (!(f & INCLUDE_MASK)) continue
+      // Skip "Erev X" markers (e.g. Erev Purim) — they duplicate the actual
+      // holiday and are not separate purchase periods.
+      if (f & EREV_FLAG) continue
+
+      const d = e.getDate().greg()
+      const dateStr = fmt(d)
+      const nameHe = stripNikud(e.renderBrief?.('he') ?? e.render('he') ?? '').trim()
+      const nameEn = stripNikud(e.renderBrief?.('en') ?? e.render('en') ?? '').trim()
+      if (!nameHe && !nameEn) continue
+
+      const key = dateStr + '|' + nameHe
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      results.push({ dateStr, nameHe, nameEn })
+    }
+
+    results.sort((a, b) => a.dateStr.localeCompare(b.dateStr))
+    return results
+  } catch {
+    return []
+  }
+}
+
 // Get Gregorian date range for an entire Hebrew year (Tishrei 1 → Elul end)
 export function hebrewYearToGregorianRange(hebrewYear: number): { start: string; end: string } {
   const startHd = new HDate(1, months.TISHREI, hebrewYear)
@@ -236,8 +338,11 @@ export const HEBREW_CALENDAR_ORDER: string[] = [
   // תשרי (Tishrei)
   'תשרי',
   'ראש השנה',
+  'פרשת וילך',       // שבת שובה — between R"H and Yom Kippur
   'צום גדליה',
+  'שבת שובה',
   'יום כיפור',
+  'פרשת האזינו',     // Shabbat between Yom Kippur and Sukkot
   'סוכות',
   'הושענא רבה',
   'שמחת תורה',
@@ -327,8 +432,6 @@ export const HEBREW_CALENDAR_ORDER: string[] = [
   'פרשת כי תצא',
   'פרשת כי תבוא',
   'פרשת נצבים',
-  'פרשת וילך',
-  'פרשת האזינו',
 ]
 
 // Map Hebrew month names to their starting index in HEBREW_CALENDAR_ORDER
@@ -392,7 +495,7 @@ export function getPaymentSortIndex(gregorianDate: string): number {
   try {
     const hd = toHDate(gregorianDate)
     const monthNum = hd.getMonth()
-    const monthName = MONTH_HE[monthNum]
+    const monthName = getMonthNameHe(monthNum, hd.getFullYear())
     if (!monthName) return 9999
 
     // Find the last item index for this month

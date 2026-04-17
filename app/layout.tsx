@@ -2,11 +2,11 @@
 import './globals.css'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User, Calendar, UserCheck, Banknote, Contact, Edit3 } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, Tag, BarChart2, Users, Menu, X, LogOut, Heart, FileText, RefreshCw, ShoppingCart, Settings, User, Calendar, UserCheck, Banknote, Contact, Edit3, Shield } from 'lucide-react'
 import { LangProvider, useLang } from '@/lib/LangContext'
 import { useState, useEffect } from 'react'
 
-type AuthUser = { id: number; username: string; display_name: string } | null
+type AuthUser = { id: number; username: string; display_name: string; role: 'super_admin' | 'user' } | null
 
 function Shell({ children }: { children: React.ReactNode }) {
   const { lang, setLang, T, isRTL } = useLang()
@@ -52,6 +52,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: '/labels', label: T.labels, icon: Edit3 },
     { href: '/reports', label: T.reports, icon: BarChart2 },
     { href: '/settings', label: T.settings, icon: Settings },
+    ...(user?.role === 'super_admin' ? [{ href: '/admin/users', label: lang === 'he' ? 'ניהול משתמשים' : 'Manage Users', icon: Shield }] : []),
   ]
 
   return (
@@ -88,6 +89,11 @@ function Shell({ children }: { children: React.ReactNode }) {
                         <Link href="/profile" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 rounded-t-xl">
                           <User size={14} /> {T.myProfile}
                         </Link>
+                        {user?.role === 'super_admin' && (
+                          <Link href="/admin/users" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                            <Shield size={14} /> {lang === 'he' ? 'ניהול משתמשים' : 'Manage Users'}
+                          </Link>
+                        )}
                         <Link href="/settings" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
                           <Settings size={14} /> {T.settings}
                         </Link>

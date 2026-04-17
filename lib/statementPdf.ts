@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex, applyLabelOverrides } from './hebrewDate'
+import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex, applyLabelOverrides } from './hebrewDate'
 import { fetchLabelOverrides } from './labelOverrides'
 
 export interface StatementMemberData {
@@ -41,7 +41,7 @@ export async function buildMemberStatementData(
     .from('transactions')
     .select('id, amount, description_he, date, notes, categories(name_he)')
     .eq('member_id', memberId)
-    .in('type', ['expense', 'purchase'])
+    .eq('type', 'purchase')
     .order('date', { ascending: true })
   if (dateFrom) purchasesQ = purchasesQ.gte('date', dateFrom)
   if (dateTo) purchasesQ = purchasesQ.lte('date', dateTo)
@@ -67,7 +67,7 @@ export async function buildMemberStatementData(
     } else {
       try {
         const hd = toHDate(c.date)
-        period = `${MONTH_HE[hd.getMonth()] ?? ''} ${yearToGematriya(hd.getFullYear())}`
+        period = `${getMonthNameHe(hd.getMonth(), hd.getFullYear())} ${yearToGematriya(hd.getFullYear())}`
       } catch {
         period = formatHebrewDate(c.date, 'he')
       }

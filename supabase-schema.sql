@@ -160,7 +160,7 @@ create table if not exists settings (
   updated_at timestamptz default now()
 );
 
-alter table settings disable row level security;
+alter table settings enable row level security;
 
 -- ============================================================
 -- INDEXES for performance
@@ -172,13 +172,23 @@ create index if not exists idx_invoice_items_invoice on invoice_items(invoice_id
 create index if not exists idx_recurring_active on recurring_transactions(active);
 
 -- ============================================================
--- Row Level Security (RLS) - disable for service role key usage
+-- Row Level Security (RLS) - enabled on all tables
+-- The app uses SUPABASE_SERVICE_ROLE_KEY which bypasses RLS,
+-- so all API routes work normally. No anon/public policies are
+-- defined, which blocks unauthorized access via the public API.
 -- ============================================================
-alter table donors disable row level security;
-alter table donor_donations disable row level security;
-alter table invoices disable row level security;
-alter table invoice_items disable row level security;
-alter table recurring_transactions disable row level security;
+alter table categories enable row level security;
+alter table users enable row level security;
+alter table sessions enable row level security;
+alter table transactions enable row level security;
+alter table members enable row level security;
+alter table member_charges enable row level security;
+alter table member_payments enable row level security;
+alter table donors enable row level security;
+alter table donor_donations enable row level security;
+alter table invoices enable row level security;
+alter table invoice_items enable row level security;
+alter table recurring_transactions enable row level security;
 
 -- If you see "permission denied" errors, also run:
 -- grant all on all tables in schema public to service_role;
@@ -207,7 +217,7 @@ create table if not exists collectors (
   created_at timestamptz default now()
 );
 
-alter table collectors disable row level security;
+alter table collectors enable row level security;
 
 -- v3: Add collector_id to donor_donations
 ALTER TABLE donor_donations ADD COLUMN IF NOT EXISTS collector_id bigint REFERENCES collectors(id) ON DELETE SET NULL;

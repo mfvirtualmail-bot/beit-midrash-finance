@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const [chargesRes, paymentsRes, purchasesRes] = await Promise.all([
       supabase.from('member_charges').select('member_id, amount, description'),
       supabase.from('member_payments').select('member_id, amount'),
-      supabase.from('transactions').select('member_id, amount').not('member_id', 'is', null).in('type', ['expense', 'purchase']),
+      supabase.from('transactions').select('member_id, amount').not('member_id', 'is', null).eq('type', 'purchase'),
     ])
 
     // Fetch donor totals

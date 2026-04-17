@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { sendPaymentConfirmationEmail } from '@/lib/email'
-import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex } from '@/lib/hebrewDate'
 
 // POST /api/email/payment-confirmation
 // Body: { member_id, payment_amount, payment_date }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       .from('transactions')
       .select('amount')
       .eq('member_id', member_id)
-      .in('type', ['expense', 'purchase'])
+      .eq('type', 'purchase')
     const { data: paymentsData } = await supabase
       .from('member_payments')
       .select('amount')
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       else {
         try {
           const hd = toHDate(c.date)
-          period = `${MONTH_HE[hd.getMonth()] ?? ''} ${yearToGematriya(hd.getFullYear())}`
+          period = `${getMonthNameHe(hd.getMonth(), hd.getFullYear())} ${yearToGematriya(hd.getFullYear())}`
         } catch { period = c.date }
       }
       recentLines.push({ date: c.date, period, description: 'דמי חבר', charge: Number(c.amount), payment: 0 })

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, getSessionUser } from '@/lib/supabase'
 import { COOKIE_NAME } from '@/lib/auth'
 import { HDate } from '@hebcal/core'
-import { MONTH_HE, hebrewYearStr, getShabbatOrHolidayLabel } from '@/lib/hebrewDate'
+import { getMonthNameHe, hebrewYearStr, getShabbatOrHolidayLabel } from '@/lib/hebrewDate'
 
 function getWeekSunday(dateStr: string): string {
   const d = new Date(dateStr)
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       ? `שנת ${yearToGematriya(hebrew_year)}`
       : (() => {
           const hd = new HDate(new Date(date_from))
-          return `${MONTH_HE[hd.getMonth()] ?? ''} ${hebrewYearStr(hd)}`
+          return `${getMonthNameHe(hd.getMonth(), hd.getFullYear())} ${hebrewYearStr(hd)}`
         })()
 
     // Get active members (active column is integer: 1=active, 0=inactive)

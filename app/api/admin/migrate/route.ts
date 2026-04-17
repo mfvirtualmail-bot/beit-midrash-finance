@@ -42,7 +42,39 @@ UPDATE member_payments SET method = 'unknown' WHERE method IS NULL OR method = '
 ALTER TABLE member_payments ALTER COLUMN method SET DEFAULT 'unknown';
 UPDATE member_payments SET method = 'unknown' WHERE method = 'cash';
 
--- v10: Label overrides — user-editable renames for parasha/holiday/period names
+-- v10: Fix purchases stored as 'expense' → should be 'purchase'
+-- Purchases are transactions with member_id set, or with a purchase-type category
+UPDATE transactions SET type = 'purchase'
+WHERE type = 'expense'
+  AND (
+    member_id IS NOT NULL
+    OR category_id IN (SELECT id FROM categories WHERE type = 'purchase')
+  );
+
+-- v11: Enable Row Level Security on ALL tables
+-- The app uses SUPABASE_SERVICE_ROLE_KEY which bypasses RLS,
+-- so all API routes continue to work. The public anon key
+-- will no longer be able to read/write any data.
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE member_charges ENABLE ROW LEVEL SECURITY;
+ALTER TABLE member_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donor_donations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recurring_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE collectors ENABLE ROW LEVEL SECURITY;
+
+-- v12: Add role column to users table for super admin control
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role text DEFAULT 'user' CHECK (role IN ('super_admin', 'user'));
+UPDATE users SET role = 'super_admin' WHERE username = 'admin';
+
+-- v13: Label overrides — user-editable renames for parasha/holiday/period names
 CREATE TABLE IF NOT EXISTS label_overrides (
   id bigint primary key generated always as identity,
   original_text text not null unique,

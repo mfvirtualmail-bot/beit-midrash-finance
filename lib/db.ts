@@ -32,6 +32,7 @@ export interface User {
   id: number
   username: string
   display_name: string
+  role: 'super_admin' | 'user'
   created_at: string
 }
 

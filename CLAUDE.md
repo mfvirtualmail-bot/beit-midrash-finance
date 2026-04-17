@@ -13,6 +13,22 @@ It contains project context, architecture notes, and a running log of all develo
 **Database:** Supabase (PostgreSQL)
 **Repo:** mfvirtualmail-bot/beit-midrash-finance
 
+> ### ⚠️ NetFree Inspector extension has MOVED
+>
+> The Chrome extension that used to live at `chrome-extension/` is now its own
+> repo: **`mfvirtualmail-bot/netfree-inspector`**. Do not reintroduce extension
+> source here. See Session 14 log entry for details.
+>
+> **Intentionally retained in this repo** (do **not** delete — they back live URLs):
+> - `docs/netfree-inspector/` — served via GitHub Pages at
+>   `https://mfvirtualmail-bot.github.io/beit-midrash-finance/netfree-inspector/`;
+>   `harmless-domains.json` is fetched daily by every deployed extension (v1.3.0+).
+> - `chrome-extension-store/privacy-policy.md` — the exact URL referenced in the
+>   Chrome Web Store listing's privacy-policy field.
+>
+> These files stay here until a future Chrome Web Store release republishes
+> them from the new repo; removing them earlier would break installed users.
+
 ---
 
 ## Tech Stack
@@ -568,6 +584,98 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 
 ---
 
+### Session 12 — 2026-04-15 (current)
+
+**Branch:** `claude/super-admin-user-control-kXlpR`
+
+**What was built (commit `11e3cd4`):**
+
+**Super Admin User Control System** — Complete role-based admin feature for managing users:
+
+1. **Database Schema (v12 migration)**:
+   - Added `role` column to `users` table: `text DEFAULT 'user' CHECK (role IN ('super_admin', 'user'))`
+   - Existing `admin` user auto-marked as `super_admin`
+   - All other users default to `user` role
+
+2. **Type Definitions**:
+   - Updated `User` interface in `lib/db.ts` to include `role: 'super_admin' | 'user'`
+
+3. **Auth System**:
+   - Updated `/api/auth/me` to return user role
+   - Added permission check helper in admin API routes to verify super_admin status
+
+4. **Admin API Routes**:
+   - `GET /api/admin/users` — List all users (name, username, role, created_at). Super admin only. Returns 403 for non-admins.
+   - `PUT /api/admin/users/[id]` — Update user:
+     - Change username (with duplicate check)
+     - Change password (optional, send empty to skip)
+     - Promote/demote role (super_admin ↔ user)
+     - Super admin only. Returns 403 for non-admins.
+
+5. **Admin UI** (`app/admin/users/page.tsx`):
+   - Full user management page (Hebrew/English bilingual, RTL support)
+   - Table with columns: Username, Display Name, Role, Actions
+   - Inline edit mode: click Edit button to modify username/password/role
+   - Role dropdown: super_admin or user
+   - Password field: optional, only changed if filled
+   - Color-coded role badges: purple for super_admin, blue for user
+   - Save/Cancel buttons in edit mode
+   - Error handling with user feedback
+   - Back button to dashboard
+   - Loading state, empty state, error state handling
+
+6. **Navigation Updates** (`app/layout.tsx`):
+   - Updated `AuthUser` type to include `role`
+   - Added "Manage Users" link to sidebar nav (visible only to super_admin)
+   - Added "Manage Users" link to user dropdown menu (visible only to super_admin)
+   - Link uses Shield icon
+   - Dynamic navigation: links only appear for super admin
+
+7. **i18n Strings** (`lib/i18n.ts`):
+   - Added Hebrew: admin, superAdmin, manageUsers, users, userRole, role, user, superAdminRole, userRole, resetPassword, newPasswordRequired, userManagement, noUsers, updateUser
+   - Added English translations for all above
+
+**Files created**:
+- `app/admin/users/page.tsx` — Super admin user management page
+- `app/api/admin/users/route.ts` — GET endpoint (list users)
+- `app/api/admin/users/[id]/route.ts` — PUT endpoint (update user)
+
+**Files modified**:
+- `lib/db.ts` — added role to User interface
+- `app/api/auth/me/route.ts` — return role in response
+- `app/api/admin/migrate/route.ts` — added v12 migration for role column
+- `app/layout.tsx` — updated AuthUser type, added admin link to nav & dropdown
+- `lib/i18n.ts` — added admin-related translation strings
+
+**How it works:**
+1. Super admin logs in (e.g., admin/admin123)
+2. Sees "Manage Users" link in sidebar and user dropdown menu
+3. Clicks link to go to `/admin/users`
+4. Page loads all users from database
+5. For each user, can click "Edit" to:
+   - Change username (with validation for duplicates)
+   - Change password (optional)
+   - Change role (promote to super_admin or demote to user)
+6. Saves changes via PUT request to `/api/admin/users/[id]`
+7. Regular users (role='user') cannot access `/admin/users` (no link shown, API returns 403)
+
+**Security:**
+- All admin endpoints check that current user is super_admin
+- Returns 403 Forbidden for non-admins
+- Username uniqueness validated
+- Password hashing uses existing PBKDF2/SHA-512 system
+- Role can only be 'super_admin' or 'user' (validated in DB constraint and API)
+
+**AFTER DEPLOY:**
+1. Run `POST /api/admin/migrate` — applies v12 migration (add role column, mark admin as super_admin)
+2. Log in as admin (admin/admin123) — will automatically be super_admin
+3. Can now manage other users via `/admin/users`
+4. Create new users or change existing users' roles/credentials as needed
+
+**Git state:** On branch `claude/super-admin-user-control-kXlpR`, pushed to origin. Ready for PR review.
+
+---
+
 ## GitHub Access
 
 - **GitHub PAT** is stored locally at `~/.github-token` (not committed to repo — blocked by GitHub secret scanning)
@@ -602,6 +710,157 @@ ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type IN (
 **Template message to give user:**
 > Please open this link to create the PR and merge it:
 > `https://github.com/mfvirtualmail-bot/beit-midrash-finance/compare/main...<branch-name>`
+
+---
+
+### Session 12 — 2026-04-10
+
+**Branch:** `claude/new-chrome-extension-pGE68`
+
+**What was built: NetFree Inspector Chrome Extension (v1.1.0)**
+
+A standalone Chrome extension (Manifest V3) that detects HTTP 418 responses from the NetFree content filter and shows blocked URLs in a popup. Entirely separate from the Beit Midrash Finance app — lives in `chrome-extension/` subfolder of this repo. Will be published to the Chrome Web Store.
+
+**Files created:**
+- `chrome-extension/manifest.json` — MV3 manifest, permissions: webRequest/tabs/storage/webNavigation + `<all_urls>` host permission; CSP allows `https://netfree.link` for img-src
+- `chrome-extension/background.js` — Service worker; listens for HTTP 418 via `chrome.webRequest.onCompleted`; detects block type via `.avif` filename in response URL (`block.avif` = blacklisted, `unknown.avif` = not whitelisted, `myset.avif` = user_settings); stores data in `chrome.storage.session`; clears on navigation
+- `chrome-extension/popup.html` — Extension popup shell; loads NetFree logo from `https://netfree.link/img/logo/netfree_logo.svg`
+- `chrome-extension/popup.js` — Popup logic; bilingual Hebrew/English; groups blocked URLs by domain; "Open Request" button generates pre-filled NetFree whitelist ticket: `https://netfree.link/app/#/tickets/new?u={url}&r={referrer}&t=site&bi=`; copy-all URLs button; badge count display
+- `chrome-extension/popup.css` — Modern card-based UI; color-coded block types: red (blacklisted), amber (not_whitelisted), purple (user_settings), gray (unknown); full RTL Hebrew + LTR English support
+- `chrome-extension/create-icons.js` — Pure Node.js PNG generator (no dependencies); creates blue-circle + white-shield + checkmark icons at 16/32/48/128px using zlib + manual CRC32
+- `chrome-extension/icons/icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` — Pre-generated icons
+- `chrome-extension/README.md` — Developer setup guide
+
+**Block types detected:**
+| Type | Signal | Badge color |
+|---|---|---|
+| Blacklisted | `block.avif` in response URL | Red 🔴 |
+| Not whitelisted | `unknown.avif` in response URL | Amber 🟡 |
+| User settings | `myset.avif` in response URL | Purple 🟣 |
+| Unknown/third-party | HTTP 418, no avif match | Gray ⚪ |
+
+**Known gap (v1.2 TODO):** NetFree also has a **file-type block** (for .zip, executable files etc.) where the block page says "This type of file is not supported by automatic filtering." This block page uses `netfree_full_logo.svg` instead of `.avif` images — current extension doesn't classify it distinctly.
+
+**Commits:**
+- `2f2dcbd` — initial extension build
+- `8f1058d` — added user_settings block type (myset.avif), bumped version to 1.1.0
+
+**Git state:** On branch `claude/new-chrome-extension-pGE68`, pushed to origin.
+
+---
+
+### Session 13 — 2026-04-10 to 2026-04-12
+
+**Branch:** `claude/new-chrome-extension-pGE68` (continuing)
+
+**What was built: Chrome Web Store submission kit**
+
+Created `chrome-extension-store/` folder at repo root with all assets needed to publish to the Chrome Web Store.
+
+**Files created:**
+- `chrome-extension-store/store-listing-he.md` — Hebrew Chrome Web Store listing (name, short description ≤132 chars, full detailed description)
+- `chrome-extension-store/store-listing-en.md` — English Chrome Web Store listing
+- `chrome-extension-store/privacy-policy.md` — Bilingual (English + Hebrew) privacy policy; required for `<all_urls>` host permission; explains local-only processing, `chrome.storage.session`, one logo request to netfree.link
+- `chrome-extension-store/promo-tile.svg` — 440×280 promotional tile (SVG vector); blue gradient background, white shield+checkmark icon, "NetFree Inspector" title, Hebrew/English taglines, 4 block-type badge icons; **must be converted to PNG before upload** (use cloudconvert.com or Photopea)
+- `chrome-extension-store/screenshots-guide.md` — Guide to taking 5 Chrome Web Store screenshots at 1280×800; explains what to show in each shot and how to resize
+- `chrome-extension-store/netfree-inspector-v1.1.0.zip` — Pre-built upload-ready ZIP (15 KB, 10 files); contains all extension files with `manifest.json` at root; excludes dev-only `create-icons.js` and `README.md`
+- `chrome-extension-store/README.md` — Full step-by-step Chrome Web Store submission walkthrough including permission justifications for Privacy tab, common rejection reasons, version update instructions
+
+**Commit:** `1a457e6`
+
+**Chrome Web Store submission status (as of session end):**
+- ✅ ZIP built and verified correct structure
+- ✅ All store listing text ready
+- ✅ Privacy policy written (needs public URL — use GitHub raw link after merging to main)
+- ✅ Promo tile SVG created (needs PNG conversion)
+- ⏳ 2-step verification must be enabled on developer Google account before ZIP upload is accepted
+- ⏳ At least 1 screenshot (1280×800 PNG, no alpha channel) needed
+- ⏳ PR not yet merged to main
+
+**Issues discovered during this session:**
+
+1. **NetFree blocks `raw.githubusercontent.com` for .zip files** — File-type block, HTTP 418 returned. GitHub raw URLs for binary files won't work for users behind NetFree. Workaround: base64-encode the ZIP in chat, user decodes with PowerShell `[Convert]::FromBase64String()`.
+
+2. **Chrome Web Store requires 2-step verification** — Error: "Enabling 2 step verification on your account is required for security purposes." Must enable at `https://myaccount.google.com/signinoptions/twosv` before upload will succeed.
+
+3. **Screenshot requirements** — Must be exactly 1280×800 or 640×400 pixels, PNG/JPEG, no alpha channel, ≤5 MB. Other sizes rejected.
+
+4. **NetFree logo warning** — User asked about using NetFree's logo as the extension icon. Advised strongly against it: trademark/copyright risk, Chrome Web Store impersonation policy would reject it, and user confusion. Existing blue-shield-checkmark icon is correct and original.
+
+**To merge to main:**
+```
+https://github.com/mfvirtualmail-bot/beit-midrash-finance/compare/main...claude/new-chrome-extension-pGE68
+```
+
+**Git state:** On branch `claude/new-chrome-extension-pGE68`, pushed to origin. Awaiting manual PR merge to main.
+
+---
+
+### Session 14 — 2026-04-16
+
+**Branch:** `claude/extract-chrome-extension-gMLsc`
+
+**What was done:** Extracted the NetFree Inspector Chrome extension into its
+own GitHub repository at **`mfvirtualmail-bot/netfree-inspector`**.
+
+**Extracted from this repo:**
+- `chrome-extension/` — extension source (deleted in this PR)
+
+**Intentionally NOT extracted (retained here — see banner at top of this file):**
+- `docs/netfree-inspector/` — the deployed extension's daily `harmless-domains.json`
+  fetch target (GitHub Pages of *this* repo). Removing would break every
+  installed v1.3.0+ copy within 24h.
+- `chrome-extension-store/` — the published Chrome Web Store privacy-policy URL
+  points into this folder. Removing would 404 the privacy policy referenced in
+  the live listing.
+
+The new repo was seeded with the 6 commits from this repo that had touched
+`chrome-extension*/` paths, preserved via `git filter-repo`, plus one
+restructure commit that moved the source to the new repo's root and the store
+kit under `store/`. Because the Claude sandbox's proxy+signing allowlist only
+covered this repo, the extracted history was transferred via a git bundle
+checked in on a scratch branch (`tmp/netfree-inspector-bundle-DELETE-ME`) with
+`BUNDLE-README.md` explaining the transfer steps. Once the user has pushed
+the bundle to the new repo, that scratch branch should be deleted.
+
+**Files touched in beit-midrash-finance (this PR):**
+- Deleted: `chrome-extension/` (entire folder)
+- Modified: `CLAUDE.md` — added prominent banner that the extension has moved
+  and explaining why `docs/` + `chrome-extension-store/` intentionally remain
+
+**Git state:** On branch `claude/extract-chrome-extension-gMLsc`, pushed to origin.
+
+---
+
+### Session 15 — 2026-04-16 (in progress)
+
+**Branch:** `claude/add-holiday-selection-Ijij2`
+
+**User request (saved immediately per user's instruction — "save this direct to claude.md before starting to work as I see that you're getting interrupted"):**
+
+On the `/purchases` page, the week/period selector currently only lists Shabbat weeks (parashot). The user wants to also be able to select **Yom Tov days** as distinct purchase periods — each holiday day should be a separate selectable period, e.g.:
+
+- יום א פסח (first day of Pesach)
+- יום ב פסח (second day of Pesach)
+- שביעי של פסח (7th day of Pesach)
+- אחרון של פסח (8th day of Pesach — chutz la'aretz)
+- שבועות (יום א / יום ב)
+- ראש השנה (יום א / יום ב)
+- יום כיפור
+- סוכות (יום א / יום ב)
+- שמיני עצרת / שמחת תורה
+- ...and so on for every Yom Tov day in the year
+
+Each should be an independent period that members can make purchases against (like the existing parasha weeks).
+
+**Task plan:**
+1. Find the current week/period list builder (likely `lib/hebrewDate.ts` — functions `getWeekLabel` / `getShabbatOrHolidayLabel`, and the purchases page UI that iterates weeks).
+2. Extend the period generator so for each Hebrew year it emits **every Yom Tov day** as its own period (alongside Shabbatot).
+3. Each period needs: a stable key (e.g. hebcal event date), a Hebrew label (e.g. "יום א פסח"), and a date to attach purchases to.
+4. Update `/purchases` page UI to show both weeks and holiday days in the selector, sorted chronologically.
+5. Make sure purchase description_he / invoice period logic still works for the new period types (currently relies on `getWeekLabel` — either extend it or branch in the purchases page).
+
+**Git state:** On branch `claude/add-holiday-selection-Ijij2`, just created. Work in progress.
 
 ---
 

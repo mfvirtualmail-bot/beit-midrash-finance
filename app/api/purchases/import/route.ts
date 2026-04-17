@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
       }
 
       transactions.push({
-        type: 'expense',
+        type: 'purchase',
         amount,
         description_he: descHe,
         description_en: null,

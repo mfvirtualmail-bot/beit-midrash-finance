@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { formatHebrewDate, toHDate, MONTH_HE, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex, applyLabelOverrides } from '@/lib/hebrewDate'
+import { formatHebrewDate, toHDate, getMonthNameHe, yearToGematriya, getHebrewPeriodSortIndex, getPaymentSortIndex, applyLabelOverrides } from '@/lib/hebrewDate'
 import { fetchLabelOverrides } from '@/lib/labelOverrides'
 
 // GET /api/statements?member_id=1 or ?member_ids=1,2,3
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
         .from('transactions')
         .select('id, amount, description_he, date, notes, categories(name_he)')
         .eq('member_id', member.id)
-        .in('type', ['expense', 'purchase'])
+        .eq('type', 'purchase')
         .order('date', { ascending: true })
       if (dateFrom) purchasesQ = purchasesQ.gte('date', dateFrom)
       if (dateTo) purchasesQ = purchasesQ.lte('date', dateTo)
@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
           // Fallback: convert date to Hebrew month+year
           try {
             const hd = toHDate(c.date)
-            const monthName = MONTH_HE[hd.getMonth()] ?? ''
+            const monthName = getMonthNameHe(hd.getMonth(), hd.getFullYear())
             const yearStr = yearToGematriya(hd.getFullYear())
             period = `${monthName} ${yearStr}`
           } catch {
