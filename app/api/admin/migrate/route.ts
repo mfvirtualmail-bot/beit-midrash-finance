@@ -85,6 +85,36 @@ CREATE TABLE IF NOT EXISTS label_overrides (
 );
 ALTER TABLE label_overrides DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_label_overrides_original ON label_overrides(original_text);
+
+-- v14: Email templates — editable, named templates for statement emails
+CREATE TABLE IF NOT EXISTS email_templates (
+  id bigint primary key generated always as identity,
+  name text not null,
+  subject text not null,
+  body_html text not null,
+  is_default boolean not null default false,
+  sort_order int not null default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+ALTER TABLE email_templates DISABLE ROW LEVEL SECURITY;
+
+-- Seed built-in templates if table is empty
+INSERT INTO email_templates (name, subject, body_html, is_default, sort_order)
+SELECT 'תבנית חודשית',
+  'דף חשבון מעודכן - {{member_name}}',
+  '<p>שלום <strong>{{member_name}}</strong>,</p><p>מצורף דף החשבון שלך. יתרה נוכחית: <strong>{{balance}}</strong>.</p><p>הדף המלא מצורף כקובץ PDF.</p>',
+  true,
+  0
+WHERE NOT EXISTS (SELECT 1 FROM email_templates);
+
+INSERT INTO email_templates (name, subject, body_html, is_default, sort_order)
+SELECT 'חייב לשעבר',
+  'יתרה פתוחה - {{member_name}}',
+  '<p>שלום <strong>{{member_name}}</strong>,</p><p>אנו פונים אליך בנוגע ליתרה הפתוחה בחשבונך בסך <strong>{{balance}}</strong>.</p><p>מצורף דף חשבון מפורט. נשמח לקבל את הסדרת החוב בהקדם.</p><p>לבירורים ניתן לפנות אלינו.</p>',
+  false,
+  1
+WHERE NOT EXISTS (SELECT 1 FROM email_templates WHERE name = 'חייב לשעבר');
 `
 
 export async function POST() {

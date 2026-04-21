@@ -61,6 +61,45 @@ function buildRecentActivityTable(lines: Array<{ date: string; period: string; d
   `
 }
 
+// ==================== TEMPLATES ====================
+
+export interface EmailTemplate {
+  id: number
+  name: string
+  subject: string
+  body_html: string
+  is_default: boolean
+}
+
+async function loadTemplate(templateId: number | null | undefined): Promise<EmailTemplate | null> {
+  if (templateId) {
+    const { data } = await supabase.from('email_templates').select('*').eq('id', templateId).single()
+    if (data) return data as EmailTemplate
+  }
+  const { data: def } = await supabase
+    .from('email_templates')
+    .select('*')
+    .eq('is_default', true)
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (def) return def as EmailTemplate
+  const { data: first } = await supabase
+    .from('email_templates')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  return (first as EmailTemplate) ?? null
+}
+
+function renderPlaceholders(text: string, vars: Record<string, string>): string {
+  return text.replace(/\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi, (_, key) => {
+    const v = vars[key.toLowerCase()]
+    return v === undefined ? '' : v
+  })
+}
+
 // ==================== STATEMENT EMAIL ====================
 
 export async function sendStatementEmail(
@@ -73,15 +112,36 @@ export async function sendStatementEmail(
   pdfBuffer: Buffer,
   pdfFileName: string,
   paymentLink?: string | null,
+  templateId?: number | null,
 ) {
   const emailSettings = await getEmailSettings()
   const transporter = createTransport(emailSettings.gmailUser, emailSettings.gmailAppPassword)
+  const template = await loadTemplate(templateId)
 
   const recentTable = buildRecentActivityTable(lines)
   const balanceFormatted = balance > 0 ? fmt(balance) : balance < 0 ? `זיכוי ${fmt(balance)}` : '€0.00'
   const balanceColor = balance > 0 ? '#1e40af' : '#16a34a'
   const balanceBg = balance > 0 ? '#eff6ff' : '#f0fdf4'
   const balanceBorder = balance > 0 ? '#bfdbfe' : '#bbf7d0'
+
+  const vars: Record<string, string> = {
+    member_name: memberName,
+    balance: balanceFormatted,
+    balance_raw: fmt(balance),
+    total_charged: fmt(totalCharged),
+    total_paid: fmt(totalPaid),
+    org_name: emailSettings.orgName,
+    date: new Date().toLocaleDateString('he-IL'),
+  }
+
+  const subject = template
+    ? renderPlaceholders(template.subject, vars)
+    : `דף חשבון מעודכן - ${memberName}`
+
+  const messageHtml = template
+    ? renderPlaceholders(template.body_html, vars)
+    : `<p style="font-size:15px;color:#1e293b;margin:0 0 12px;">שלום <strong>${memberName}</strong>,</p>
+       <p style="font-size:14px;color:#475569;margin:0 0 20px;">מצורף דף החשבון שלך. יתרה נוכחית: <strong>${balanceFormatted}</strong>.</p>`
 
   const html = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -96,11 +156,10 @@ export async function sendStatementEmail(
 
     <!-- Body -->
     <div style="background:white;padding:24px;border:1px solid #e2e8f0;border-top:none;">
-      <p style="font-size:15px;color:#1e293b;margin:0 0 12px;">שלום <strong>${memberName}</strong>,</p>
-      <p style="font-size:14px;color:#475569;margin:0 0 20px;">מצורף דף החשבון שלך. יתרה נוכחית: <strong>${balanceFormatted}</strong>.</p>
+      <div style="font-size:14px;color:#1e293b;line-height:1.6;">${messageHtml}</div>
 
       <!-- Summary cards -->
-      <div style="display:flex;gap:12px;margin-bottom:20px;">
+      <div style="display:flex;gap:12px;margin:20px 0;">
         <div style="flex:1;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;text-align:center;">
           <div style="font-size:11px;color:#dc2626;font-weight:600;">סה"כ חיובים</div>
           <div style="font-size:18px;font-weight:800;color:#dc2626;margin-top:4px;">${fmt(totalCharged)}</div>
@@ -147,7 +206,7 @@ export async function sendStatementEmail(
   await transporter.sendMail({
     from: `"${emailSettings.senderName}" <${emailSettings.gmailUser}>`,
     to: memberEmail,
-    subject: `דף חשבון מעודכן - ${memberName}`,
+    subject,
     html,
     attachments: [
       {

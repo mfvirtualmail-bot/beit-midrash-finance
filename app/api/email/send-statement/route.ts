@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
     const dateFrom = formData.get('date_from') as string | null
     const dateTo = formData.get('date_to') as string | null
     const pdfFile = formData.get('pdf') as File | null
+    const templateIdRaw = formData.get('template_id') as string | null
+    const templateId = templateIdRaw ? Number(templateIdRaw) : null
 
     if (!memberId) return NextResponse.json({ error: 'member_id required' }, { status: 400 })
 
@@ -109,6 +111,7 @@ export async function POST(req: NextRequest) {
       pdfBuffer,
       pdfFileName,
       paymentLink,
+      templateId,
     )
 
     return NextResponse.json({ ok: true, message: 'Email sent successfully', paymentLink })

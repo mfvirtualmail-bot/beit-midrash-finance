@@ -42,6 +42,8 @@ export default function MemberDetailPage() {
   // Email statement
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailMsg, setEmailMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [emailTemplates, setEmailTemplates] = useState<Array<{ id: number; name: string; is_default: boolean }>>([])
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   // Payment email prompt
   const [paymentEmailPrompt, setPaymentEmailPrompt] = useState<{ amount: number; date: string } | null>(null)
   const [sendingPaymentEmail, setSendingPaymentEmail] = useState(false)
@@ -51,6 +53,13 @@ export default function MemberDetailPage() {
   const [customMethod, setCustomMethod] = useState('')
 
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  // Load email templates
+  useEffect(() => {
+    fetch('/api/email-templates').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setEmailTemplates(data)
+    }).catch(() => {})
+  }, [])
 
   // Load payment methods from settings
   useEffect(() => {
@@ -142,17 +151,28 @@ export default function MemberDetailPage() {
     load()
   }
 
-  async function handleSendStatementEmail() {
+  function handleSendStatementEmail() {
     if (!data?.member.email) {
       setEmailMsg({ type: 'err', text: lang === 'he' ? 'לחבר אין כתובת אימייל' : 'Member has no email address' })
       setTimeout(() => setEmailMsg(null), 4000)
       return
     }
+    if (emailTemplates.length > 1) {
+      setShowTemplatePicker(true)
+      return
+    }
+    const defaultTpl = emailTemplates.find(t => t.is_default) || emailTemplates[0]
+    sendWithTemplate(defaultTpl?.id ?? null)
+  }
+
+  async function sendWithTemplate(templateId: number | null) {
+    setShowTemplatePicker(false)
     setSendingEmail(true)
     setEmailMsg(null)
     try {
       const fd = new FormData()
       fd.append('member_id', id)
+      if (templateId) fd.append('template_id', String(templateId))
       const res = await fetch('/api/email/send-statement', { method: 'POST', body: fd })
       const result = await res.json()
       if (res.ok) {
@@ -224,6 +244,48 @@ export default function MemberDetailPage() {
         <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${emailMsg.type === 'ok' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {emailMsg.type === 'ok' ? <Mail size={16} /> : <X size={16} />}
           {emailMsg.text}
+        </div>
+      )}
+
+      {/* Template picker modal */}
+      {showTemplatePicker && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowTemplatePicker(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Mail size={18} className="text-purple-600" />
+                {lang === 'he' ? 'בחר תבנית אימייל' : 'Choose email template'}
+              </h2>
+              <button onClick={() => setShowTemplatePicker(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X size={18} className="text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {emailTemplates.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => sendWithTemplate(t.id)}
+                  className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-gray-50 hover:bg-purple-50 border border-gray-200 hover:border-purple-300 rounded-xl text-sm text-gray-800 font-medium text-right transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Send size={14} className="text-purple-500" />
+                    {t.name}
+                  </span>
+                  {t.is_default && (
+                    <span className="text-[10px] px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full">
+                      {lang === 'he' ? 'ברירת מחדל' : 'default'}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <Link
+              href="/settings/email-templates"
+              className="block text-xs text-center text-purple-600 hover:text-purple-800 underline"
+            >
+              {lang === 'he' ? 'נהל תבניות' : 'Manage templates'}
+            </Link>
+          </div>
         </div>
       )}
 
