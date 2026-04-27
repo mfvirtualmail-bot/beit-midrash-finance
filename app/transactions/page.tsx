@@ -131,13 +131,33 @@ export default function TransactionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="card">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <select className="input" value={filters.type} onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}>
-            <option value="">{T.all}</option>
-            <option value="income">{T.income}</option>
-            <option value="expense">{T.expense}</option>
-          </select>
+      <div className="card space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: '', label: T.all, color: 'blue' },
+            { value: 'income', label: T.income, color: 'green' },
+            { value: 'expense', label: T.expense, color: 'red' },
+            { value: 'purchase', label: lang === 'he' ? 'רכישה' : 'Purchase', color: 'orange' },
+          ].map(b => {
+            const active = filters.type === b.value
+            const palette: Record<string, string> = {
+              blue: active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-300 hover:bg-blue-50',
+              green: active ? 'bg-green-600 text-white border-green-600' : 'bg-white text-green-700 border-green-300 hover:bg-green-50',
+              red: active ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-700 border-red-300 hover:bg-red-50',
+              orange: active ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-orange-700 border-orange-300 hover:bg-orange-50',
+            }
+            return (
+              <button
+                key={b.value || 'all'}
+                onClick={() => setFilters(f => ({ ...f, type: b.value }))}
+                className={`px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${palette[b.color]}`}
+              >
+                {b.label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <select className="input" value={filters.category} onChange={e => setFilters(f => ({ ...f, category: e.target.value }))}>
             <option value="">{T.all} {T.categories}</option>
             {categories.map(c => (

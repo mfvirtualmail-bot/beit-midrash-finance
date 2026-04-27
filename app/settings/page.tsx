@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail, CreditCard, Plus, X, GripVertical, ChevronLeft } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail, CreditCard, Plus, X, GripVertical, ChevronLeft, Tag, Edit3 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 
@@ -182,6 +182,34 @@ export default function SettingsPage() {
           {msg.text}
         </div>
       )}
+
+      {/* Categories & Labels */}
+      <div className="card space-y-3">
+        <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+          <Tag size={16} className="text-blue-500" />
+          {lang === 'he' ? 'קטגוריות ושמות' : 'Categories & Labels'}
+        </h2>
+        <Link
+          href="/categories"
+          className="flex items-center justify-between gap-2 text-sm px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 rounded-xl font-medium transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Tag size={14} />
+            {T.categories}
+          </span>
+          <ChevronLeft size={16} className={lang === 'he' ? '' : 'rotate-180'} />
+        </Link>
+        <Link
+          href="/labels"
+          className="flex items-center justify-between gap-2 text-sm px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100 rounded-xl font-medium transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Edit3 size={14} />
+            {T.labels}
+          </span>
+          <ChevronLeft size={16} className={lang === 'he' ? '' : 'rotate-180'} />
+        </Link>
+      </div>
 
       {/* Logo Upload */}
       <div className="card space-y-4">
