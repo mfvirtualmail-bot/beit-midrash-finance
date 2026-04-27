@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { renderCollectionPdf } from '@/lib/pdfReact'
 import { loadOrgSettings } from '@/lib/statementPdf'
+import { pdfDisposition } from '@/lib/pdfDisposition'
 
 interface CollectionRow {
   name: string
@@ -9,50 +10,66 @@ interface CollectionRow {
 }
 
 export async function GET(req: NextRequest) {
-  const format = req.nextUrl.searchParams.get('format')
+  try {
+    const format = req.nextUrl.searchParams.get('format')
 
-  const [{ data: members }, { data: charges }, { data: payments }, { data: purchases }] = await Promise.all([
-    supabase.from('members').select('id, name').order('name'),
-    supabase.from('member_charges').select('member_id, amount'),
-    supabase.from('member_payments').select('member_id, amount'),
-    supabase.from('transactions').select('member_id, amount').not('member_id', 'is', null).eq('type', 'purchase'),
-  ])
+    const [{ data: members }, { data: charges }, { data: payments }, { data: purchases }] = await Promise.all([
+      supabase.from('members').select('id, name').order('name'),
+      supabase.from('member_charges').select('member_id, amount'),
+      supabase.from('member_payments').select('member_id, amount'),
+      supabase.from('transactions').select('member_id, amount').not('member_id', 'is', null).eq('type', 'purchase'),
+    ])
 
-  const chargesByMember = new Map<number, number>()
-  for (const c of charges ?? []) chargesByMember.set(c.member_id, (chargesByMember.get(c.member_id) || 0) + Number(c.amount))
-  for (const p of purchases ?? []) chargesByMember.set(p.member_id, (chargesByMember.get(p.member_id) || 0) + Number(p.amount))
+    const chargesByMember = new Map<number, number>()
+    for (const c of charges ?? []) chargesByMember.set(c.member_id, (chargesByMember.get(c.member_id) || 0) + Number(c.amount))
+    for (const p of purchases ?? []) chargesByMember.set(p.member_id, (chargesByMember.get(p.member_id) || 0) + Number(p.amount))
 
-  const paymentsByMember = new Map<number, number>()
-  for (const p of payments ?? []) paymentsByMember.set(p.member_id, (paymentsByMember.get(p.member_id) || 0) + Number(p.amount))
+    const paymentsByMember = new Map<number, number>()
+    for (const p of payments ?? []) paymentsByMember.set(p.member_id, (paymentsByMember.get(p.member_id) || 0) + Number(p.amount))
 
-  const rows: CollectionRow[] = (members ?? [])
-    .map(m => ({
-      name: m.name as string,
-      owed: (chargesByMember.get(m.id) || 0) - (paymentsByMember.get(m.id) || 0),
-    }))
-    .filter(r => r.owed > 0.005)
-    .sort((a, b) => a.name.localeCompare(b.name, 'he'))
+    const rows: CollectionRow[] = (members ?? [])
+      .map(m => ({
+        name: m.name as string,
+        owed: (chargesByMember.get(m.id) || 0) - (paymentsByMember.get(m.id) || 0),
+      }))
+      .filter(r => r.owed > 0.005)
+      .sort((a, b) => a.name.localeCompare(b.name, 'he'))
 
-  const totalOwed = rows.reduce((s, r) => s + r.owed, 0)
-  const org = await loadOrgSettings()
+    const totalOwed = rows.reduce((s, r) => s + r.owed, 0)
+    const org = await loadOrgSettings()
 
-  if (format === 'html') {
-    const html = generateCollectionHtml(rows, totalOwed, org)
-    return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    if (format === 'html') {
+      const html = generateCollectionHtml(rows, totalOwed, org)
+      return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    }
+
+    const pdfBuffer = await renderCollectionPdf(rows, totalOwed, {
+      orgName: org.orgName,
+      orgAddress: org.orgAddress,
+      logoDataUrl: org.logoDataUrl,
+    })
+
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      console.error('[collection-pdf] renderCollectionPdf returned empty buffer')
+      return NextResponse.json({ error: 'PDF render produced empty output' }, { status: 500 })
+    }
+
+    const filename = `רשימת_גבייה_${new Date().toISOString().split('T')[0]}.pdf`
+    return new NextResponse(new Uint8Array(pdfBuffer), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(pdfBuffer.length),
+        'Content-Disposition': pdfDisposition(filename, 'inline'),
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (err) {
+    console.error('[collection-pdf] error:', err)
+    return NextResponse.json(
+      { error: 'PDF render failed', detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    )
   }
-
-  const pdfBuffer = await renderCollectionPdf(rows, totalOwed, {
-    orgName: org.orgName,
-    orgAddress: org.orgAddress,
-    logoDataUrl: org.logoDataUrl,
-  })
-  const filename = `רשימת_גבייה_${new Date().toISOString().split('T')[0]}.pdf`
-  return new NextResponse(new Uint8Array(pdfBuffer), {
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="${filename}"`,
-    },
-  })
 }
 
 function generateCollectionHtml(
@@ -224,4 +241,5 @@ function escapeHtml(s: string): string {
 }
 
 export const runtime = 'nodejs'
+export const maxDuration = 60
 export const dynamic = 'force-dynamic'
