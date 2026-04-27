@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { buildMemberStatementData, generateStatementHtml, loadOrgSettings } from '@/lib/statementPdf'
-import { htmlToPdf } from '@/lib/htmlToPdf'
+import { renderStatementPdf } from '@/lib/pdfReact'
 
 // GET /api/statements/pdf?member_ids=1,2,3&date_from=...&date_to=...&format=html
-// Returns real PDF by default. Pass format=html to get HTML (for browser preview).
+// Returns real PDF (rendered via @react-pdf/renderer) by default.
+// Pass format=html to get the legacy rich-HTML preview (used for browser
+// preview and as a fallback that still renders styled rich-text header/footer).
 export async function GET(req: NextRequest) {
   const memberIdsParam = req.nextUrl.searchParams.get('member_ids')
   const dateFrom = req.nextUrl.searchParams.get('date_from')
@@ -17,7 +19,6 @@ export async function GET(req: NextRequest) {
 
   const memberIds = memberIdsParam.split(',').map(Number)
 
-  // Get members
   const { data: members } = await supabase
     .from('members')
     .select('id, name, phone, email, address')
@@ -29,24 +30,19 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Build statement data for each member
   const memberData = await Promise.all(
     members.map(member => buildMemberStatementData(member.id, member, dateFrom, dateTo))
   )
-
-  // Load org settings and generate HTML
   const orgSettings = await loadOrgSettings()
-  const html = generateStatementHtml(memberData, orgSettings)
 
-  // Return HTML for browser preview
   if (format === 'html') {
+    const html = generateStatementHtml(memberData, orgSettings)
     return new NextResponse(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     })
   }
 
-  // Convert to real PDF using headless Chromium
-  const pdfBuffer = await htmlToPdf(html)
+  const pdfBuffer = await renderStatementPdf(memberData, orgSettings)
 
   const firstName = members[0]?.name?.replace(/\s+/g, '_') || 'statement'
   const filename = members.length === 1
@@ -61,6 +57,5 @@ export async function GET(req: NextRequest) {
   })
 }
 
-// Vercel function config — Chromium needs more memory and time
-export const maxDuration = 30
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
