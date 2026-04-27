@@ -115,6 +115,49 @@ SELECT 'חייב לשעבר',
   false,
   1
 WHERE NOT EXISTS (SELECT 1 FROM email_templates WHERE name = 'חייב לשעבר');
+
+-- v15: Purchase item templates — pre-filled item lists for Shabbat / Yom Tov
+CREATE TABLE IF NOT EXISTS purchase_item_templates (
+  id bigint primary key generated always as identity,
+  template_key text not null unique,
+  label_he text not null,
+  sort_order int not null default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+ALTER TABLE purchase_item_templates DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS purchase_item_template_items (
+  id bigint primary key generated always as identity,
+  template_id bigint not null references purchase_item_templates(id) on delete cascade,
+  label_he text not null,
+  sort_order int not null default 0
+);
+ALTER TABLE purchase_item_template_items DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_purchase_item_template_items_template ON purchase_item_template_items(template_id);
+
+-- Seed default Shabbat template + items
+INSERT INTO purchase_item_templates (template_key, label_he, sort_order)
+SELECT 'shabbat', 'שבת', 0
+WHERE NOT EXISTS (SELECT 1 FROM purchase_item_templates WHERE template_key = 'shabbat');
+
+INSERT INTO purchase_item_template_items (template_id, label_he, sort_order)
+SELECT t.id, item.label, item.ord
+FROM purchase_item_templates t
+CROSS JOIN (VALUES
+  ('הוצאה והכנסה', 0),
+  ('פתיחה', 1),
+  ('עליה לתורה - ראשון', 2),
+  ('עליה לתורה - שני', 3),
+  ('עליה לתורה - שלישי', 4),
+  ('עליה לתורה - רביעי', 5),
+  ('עליה לתורה - חמישי', 6),
+  ('עליה לתורה - שישי', 7),
+  ('עליה לתורה - שביעי', 8),
+  ('עליה לתורה - מפטיר', 9)
+) AS item(label, ord)
+WHERE t.template_key = 'shabbat'
+  AND NOT EXISTS (SELECT 1 FROM purchase_item_template_items WHERE template_id = t.id);
 `
 
 export async function POST() {
