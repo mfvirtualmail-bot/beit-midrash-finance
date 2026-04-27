@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle, FileText, CreditCard, Copy, ExternalLink } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle, FileText, CreditCard, Copy, ExternalLink, ClipboardList } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
 import Link from 'next/link'
 
@@ -214,6 +214,15 @@ export default function MembersPage() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-gray-800">{T.members}</h1>
         <div className="flex gap-2 flex-wrap">
+          <a
+            href="/api/members/collection-pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium transition-colors"
+          >
+            <ClipboardList size={15} />
+            {lang === 'he' ? 'רשימת גבייה (PDF)' : 'Collection Sheet (PDF)'}
+          </a>
           <button
             onClick={openFeeModal}
             className="flex items-center gap-2 text-sm px-3 py-2 bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 rounded-xl font-medium transition-colors"

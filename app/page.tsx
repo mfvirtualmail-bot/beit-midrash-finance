@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { TrendingUp, TrendingDown, Scale, ArrowLeftRight, Users, AlertCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Scale, ArrowLeftRight, Users, AlertCircle, ClipboardList } from 'lucide-react'
 import type { Transaction } from '@/lib/db'
 
 interface Summary {
@@ -50,9 +50,20 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <img src="/api/logo" alt="Logo" className="w-12 h-12 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-        <h1 className="text-2xl font-bold text-gray-900">{T.dashboard} — {currentYear}</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <img src="/api/logo" alt="Logo" className="w-12 h-12 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          <h1 className="text-2xl font-bold text-gray-900">{T.dashboard} — {currentYear}</h1>
+        </div>
+        <a
+          href="/api/members/collection-pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-sm px-3 py-2 bg-blue-50 border border-blue-300 text-blue-800 hover:bg-blue-100 rounded-xl font-medium transition-colors"
+        >
+          <ClipboardList size={15} />
+          {lang === 'he' ? 'רשימת גבייה (PDF)' : 'Collection Sheet (PDF)'}
+        </a>
       </div>
 
       {/* Row 1: Member charges picture */}
