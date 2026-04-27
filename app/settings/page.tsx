@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail, CreditCard, Plus, X, GripVertical } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail, CreditCard, Plus, X, GripVertical, ChevronLeft } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor'), { ssr: false })
 
@@ -395,6 +396,16 @@ export default function SettingsPage() {
               {lang === 'he' ? 'השם שיופיע בשדה "מאת" בכל המיילים' : 'Name shown in the "From" field of all emails'}
             </p>
           </div>
+          <Link
+            href="/settings/email-templates"
+            className="flex items-center justify-between gap-2 text-sm px-4 py-3 bg-purple-50 border border-purple-200 text-purple-800 hover:bg-purple-100 rounded-xl font-medium transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Mail size={14} />
+              {lang === 'he' ? 'נהל תבניות אימייל (חודשית, חייב לשעבר, ועוד)' : 'Manage email templates (monthly, former member, more)'}
+            </span>
+            <ChevronLeft size={16} className={lang === 'he' ? '' : 'rotate-180'} />
+          </Link>
         </div>
 
         {/* Stripe Payment Settings */}
