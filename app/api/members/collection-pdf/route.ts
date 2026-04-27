@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import { htmlToPdf } from '@/lib/htmlToPdf'
+import { renderCollectionPdf } from '@/lib/pdfReact'
 import { loadOrgSettings } from '@/lib/statementPdf'
 
 interface CollectionRow {
@@ -35,13 +35,17 @@ export async function GET(req: NextRequest) {
 
   const totalOwed = rows.reduce((s, r) => s + r.owed, 0)
   const org = await loadOrgSettings()
-  const html = generateCollectionHtml(rows, totalOwed, org)
 
   if (format === 'html') {
+    const html = generateCollectionHtml(rows, totalOwed, org)
     return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
   }
 
-  const pdfBuffer = await htmlToPdf(html)
+  const pdfBuffer = await renderCollectionPdf(rows, totalOwed, {
+    orgName: org.orgName,
+    orgAddress: org.orgAddress,
+    logoDataUrl: org.logoDataUrl,
+  })
   const filename = `רשימת_גבייה_${new Date().toISOString().split('T')[0]}.pdf`
   return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {
@@ -219,5 +223,5 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-export const maxDuration = 30
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

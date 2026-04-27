@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { sendStatementEmail } from '@/lib/email'
-import { buildMemberStatementData, generateStatementHtml, loadOrgSettings } from '@/lib/statementPdf'
-import { htmlToPdf } from '@/lib/htmlToPdf'
+import { buildMemberStatementData, loadOrgSettings } from '@/lib/statementPdf'
+import { renderStatementPdf } from '@/lib/pdfReact'
 import Stripe from 'stripe'
 
 // POST /api/email/send-statement
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     const { lines, totalCharged, totalPaid, balance } = statementData
 
-    // Prepare PDF attachment — generate real PDF from HTML using headless Chromium
+    // Prepare PDF attachment — render via @react-pdf/renderer (fast, no Chromium)
     let pdfBuffer: Buffer
     const pdfFileName = `דף_חשבון_${member.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
 
@@ -48,10 +48,8 @@ export async function POST(req: NextRequest) {
       // Client sent a generated PDF
       pdfBuffer = Buffer.from(await pdfFile.arrayBuffer())
     } else {
-      // Generate HTML, then convert to real PDF via headless Chromium
       const orgSettings = await loadOrgSettings()
-      const htmlContent = generateStatementHtml([statementData], orgSettings)
-      pdfBuffer = await htmlToPdf(htmlContent)
+      pdfBuffer = await renderStatementPdf([statementData], orgSettings)
     }
 
     // Optionally generate a Stripe payment link if balance > 0 and Stripe is configured
@@ -121,6 +119,5 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Vercel function config — Chromium needs more memory and time
-export const maxDuration = 30
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
