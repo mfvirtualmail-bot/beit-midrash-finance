@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle, FileText, CreditCard, Copy, ExternalLink, ClipboardList } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Eye, Phone, Mail, Upload, CalendarDays, CheckCircle, AlertCircle, FileText, CreditCard, Copy, ExternalLink, ClipboardList, Contact } from 'lucide-react'
 import { useLang } from '@/lib/LangContext'
 import Link from 'next/link'
 
@@ -232,6 +232,13 @@ export default function MembersPage() {
           </button>
           <Link href="/members/import" className="btn-secondary flex items-center gap-2 text-sm">
             <Upload size={15} /> {lang === 'he' ? 'ייבוא' : 'Import'}
+          </Link>
+          <Link
+            href="/clients"
+            className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 border border-purple-300 text-purple-800 hover:bg-purple-100 rounded-xl font-medium transition-colors"
+          >
+            <Contact size={15} />
+            {lang === 'he' ? 'עריכת פרטי חברים' : 'Edit Members Information'}
           </Link>
           <button onClick={openAdd} className="btn-primary flex items-center gap-2">
             <Plus size={16} /> {T.addMember}
