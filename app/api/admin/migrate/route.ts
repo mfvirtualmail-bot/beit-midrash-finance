@@ -136,11 +136,33 @@ CREATE TABLE IF NOT EXISTS purchase_item_template_items (
 ALTER TABLE purchase_item_template_items DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_purchase_item_template_items_template ON purchase_item_template_items(template_id);
 
--- Seed default Shabbat template + items
+-- Seed templates: Shabbat plus common holidays. Each starts with the same
+-- standard 10-item list as a starting point — the user edits each in
+-- /settings/purchase-templates. Holiday template_keys are matched by prefix
+-- against the canonical Hebcal day names (e.g. 'פסח' matches 'פסח א'',
+-- 'פסח ב'', 'פסח ג' (חוה'מ)' etc.).
 INSERT INTO purchase_item_templates (template_key, label_he, sort_order)
-SELECT 'shabbat', 'שבת', 0
-WHERE NOT EXISTS (SELECT 1 FROM purchase_item_templates WHERE template_key = 'shabbat');
+SELECT v.k, v.l, v.o
+FROM (VALUES
+  ('shabbat',          'שבת',           0),
+  ('ראש השנה',         'ראש השנה',     1),
+  ('יום כיפור',        'יום כיפור',    2),
+  ('סוכות',            'סוכות',         3),
+  ('הושענא רבה',       'הושענא רבה',   4),
+  ('שמיני עצרת',       'שמיני עצרת',   5),
+  ('שמחת תורה',        'שמחת תורה',    6),
+  ('פסח',              'פסח',           7),
+  ('שבועות',           'שבועות',        8),
+  ('חנוכה',            'חנוכה',         9),
+  ('פורים',            'פורים',        10),
+  ('תשעה באב',         'תשעה באב',     11),
+  ('ראש חודש',         'ראש חודש',     12)
+) AS v(k, l, o)
+WHERE NOT EXISTS (
+  SELECT 1 FROM purchase_item_templates pit WHERE pit.template_key = v.k
+);
 
+-- Seed the standard 10 items into every template that has none yet
 INSERT INTO purchase_item_template_items (template_id, label_he, sort_order)
 SELECT t.id, item.label, item.ord
 FROM purchase_item_templates t
@@ -156,8 +178,9 @@ CROSS JOIN (VALUES
   ('עליה לתורה - שביעי', 8),
   ('עליה לתורה - מפטיר', 9)
 ) AS item(label, ord)
-WHERE t.template_key = 'shabbat'
-  AND NOT EXISTS (SELECT 1 FROM purchase_item_template_items WHERE template_id = t.id);
+WHERE NOT EXISTS (
+  SELECT 1 FROM purchase_item_template_items i WHERE i.template_id = t.id
+);
 `
 
 export async function POST() {

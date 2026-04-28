@@ -169,8 +169,17 @@ function PurchasesPageInner() {
   const [rowsTouched, setRowsTouched] = useState(false)
 
   const matchedTemplate = useMemo(() => {
-    if (!selectedCell?.templateKey) return null
-    return templates.find(t => t.template_key === selectedCell.templateKey) ?? null
+    const key = selectedCell?.templateKey
+    if (!key) return null
+    const exact = templates.find(t => t.template_key === key)
+    if (exact) return exact
+    // Prefix match: a template "פסח" matches cell keys "פסח א'", "פסח ב'",
+    // "פסח ג' (חוה'מ)" etc. Longest prefix wins.
+    // Skip 'shabbat' (it's the explicit fallback key for plain Saturdays).
+    const prefix = templates
+      .filter(t => t.template_key && t.template_key !== 'shabbat' && key.startsWith(t.template_key))
+      .sort((a, b) => b.template_key.length - a.template_key.length)[0]
+    return prefix ?? null
   }, [templates, selectedCell?.templateKey])
 
   useEffect(() => {
