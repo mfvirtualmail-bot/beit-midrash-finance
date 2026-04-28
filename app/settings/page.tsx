@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useLang } from '@/lib/LangContext'
-import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail, CreditCard, Plus, X, GripVertical, ChevronLeft, Tag, Edit3 } from 'lucide-react'
+import { Settings, CheckCircle, AlertCircle, Building2, Upload, Trash2, ImageIcon, Database, FileText, Eye, Mail, CreditCard, Plus, X, GripVertical, ChevronLeft, ListChecks, Tag, Edit3 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 
@@ -431,6 +431,29 @@ export default function SettingsPage() {
             <span className="flex items-center gap-2">
               <Mail size={14} />
               {lang === 'he' ? 'נהל תבניות אימייל (חודשית, חייב לשעבר, ועוד)' : 'Manage email templates (monthly, former member, more)'}
+            </span>
+            <ChevronLeft size={16} className={lang === 'he' ? '' : 'rotate-180'} />
+          </Link>
+        </div>
+
+        {/* Purchase Item Templates */}
+        <div className="card space-y-3">
+          <h2 className="text-base font-semibold text-gray-700 border-b border-gray-100 pb-3 flex items-center gap-2">
+            <ListChecks size={16} className="text-orange-500" />
+            {lang === 'he' ? 'תבניות פריטי רכישה' : 'Purchase Item Templates'}
+          </h2>
+          <p className="text-xs text-gray-500">
+            {lang === 'he'
+              ? 'הגדר רשימות פריטים מומלצות לכל סוג יום (שבת, חגים) — הפריטים יוצגו אוטומטית כשתבחר את היום בעמוד הרכישות.'
+              : 'Define recommended item lists per day type (Shabbat, holidays). Items pre-fill automatically when you pick that day on the Purchases page.'}
+          </p>
+          <Link
+            href="/settings/purchase-templates"
+            className="flex items-center justify-between gap-2 text-sm px-4 py-3 bg-orange-50 border border-orange-200 text-orange-800 hover:bg-orange-100 rounded-xl font-medium transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <ListChecks size={14} />
+              {lang === 'he' ? 'נהל תבניות פריטים' : 'Manage purchase item templates'}
             </span>
             <ChevronLeft size={16} className={lang === 'he' ? '' : 'rotate-180'} />
           </Link>

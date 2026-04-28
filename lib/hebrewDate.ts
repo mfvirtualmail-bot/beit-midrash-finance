@@ -312,6 +312,167 @@ export function getHolidayPeriodsForMonth(hebrewMonth: number, hebrewYear: numbe
   }
 }
 
+// Day info for a single day in the Hebrew month calendar grid.
+export interface HebrewDayCell {
+  dateStr: string         // YYYY-MM-DD gregorian
+  hebrewDay: number       // 1..30
+  hebrewDayLabel: string  // gematria, e.g. "כ״ב"
+  inMonth: boolean        // false for padding days from neighbouring months
+  dayOfWeek: number       // 0=Sun .. 6=Sat
+  isShabbat: boolean
+  parashaHe: string       // parasha name if Shabbat (already nikud-stripped)
+  parashaEn: string
+  holidayHe: string       // holiday name if any
+  holidayEn: string
+  templateKey: string     // suggested template lookup key for this day ('' = no default template)
+  defaultLabelHe: string  // suggested editable label for the day
+  defaultLabelEn: string
+  isToday: boolean
+}
+
+const DAY_GEMATRIA: Record<number, string> = {
+  1:'א׳', 2:'ב׳', 3:'ג׳', 4:'ד׳', 5:'ה׳', 6:'ו׳', 7:'ז׳', 8:'ח׳', 9:'ט׳',
+  10:'י׳', 11:'י״א', 12:'י״ב', 13:'י״ג', 14:'י״ד', 15:'ט״ו', 16:'ט״ז',
+  17:'י״ז', 18:'י״ח', 19:'י״ט', 20:'כ׳', 21:'כ״א', 22:'כ״ב', 23:'כ״ג',
+  24:'כ״ד', 25:'כ״ה', 26:'כ״ו', 27:'כ״ז', 28:'כ״ח', 29:'כ״ט', 30:'ל׳',
+}
+
+export function dayToGematria(d: number): string {
+  return DAY_GEMATRIA[d] ?? String(d)
+}
+
+function fmtGreg(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/**
+ * Build a 6x7 calendar grid for a Hebrew month.
+ * Includes padding days from neighbouring months so each row has 7 cells.
+ * For each day, computes the Hebrew date label, parasha (if Shabbat),
+ * holiday name (if any), and a suggested template lookup key.
+ */
+export function buildHebrewMonthGrid(hebrewMonth: number, hebrewYear: number): HebrewDayCell[] {
+  const range = hebrewMonthToGregorianRange(hebrewMonth, hebrewYear)
+  const [sy, sm, sd] = range.start.split('-').map(Number)
+  const [ey, em, ed] = range.end.split('-').map(Number)
+  const monthStart = new Date(sy, sm - 1, sd)
+  const monthEnd = new Date(ey, em - 1, ed)
+
+  // Pad to start on Sunday and end on Saturday
+  const gridStart = new Date(monthStart)
+  gridStart.setDate(monthStart.getDate() - monthStart.getDay())
+  const gridEnd = new Date(monthEnd)
+  gridEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()))
+
+  // Pull all events spanning the visible grid in one call
+  const allEvents = HebrewCalendar.calendar({
+    start: gridStart,
+    end: gridEnd,
+    sedrot: true,
+    il: false,
+    noHolidays: false,
+  } as CalOptions)
+
+  // Index events by YYYY-MM-DD
+  const eventsByDate: Record<string, typeof allEvents> = {}
+  for (const e of allEvents) {
+    const dateStr = fmtGreg(e.getDate().greg())
+    ;(eventsByDate[dateStr] ??= []).push(e)
+  }
+
+  const todayStr = fmtGreg(new Date())
+  const fAny = flags as unknown as Record<string, number>
+  const HOLIDAY_MASK =
+    (fAny.CHAG ?? 0) |
+    (fAny.CHOL_HAMOED ?? 0) |
+    (fAny.MAJOR_FAST ?? 0) |
+    (fAny.MINOR_HOLIDAY ?? 0) |
+    (fAny.CHANUKAH_CANDLES ?? 0)
+  const EREV_FLAG = fAny.EREV ?? 0
+  const PARSHA_FLAG = fAny.PARSHA_HASHAVUA ?? 0
+  const SPECIAL_SHABBAT_FLAG = fAny.SPECIAL_SHABBAT ?? 0
+
+  const cells: HebrewDayCell[] = []
+  const cur = new Date(gridStart)
+  while (cur <= gridEnd) {
+    const dateStr = fmtGreg(cur)
+    const hd = new HDate(cur)
+    const dow = cur.getDay()
+    const inMonth = cur >= monthStart && cur <= monthEnd
+    const evts = eventsByDate[dateStr] ?? []
+
+    // Holiday: first non-Erev event matching the holiday mask
+    const holidayEvt = evts.find(e => {
+      const f = e.getFlags()
+      return (f & HOLIDAY_MASK) && !(f & EREV_FLAG)
+    })
+    const parashaEvt = dow === 6 ? evts.find(e => e.getFlags() & PARSHA_FLAG) : undefined
+    const specialShabbatEvt = dow === 6 ? evts.find(e => e.getFlags() & SPECIAL_SHABBAT_FLAG) : undefined
+
+    const holidayHe = holidayEvt
+      ? stripNikud(holidayEvt.renderBrief?.('he') ?? holidayEvt.render('he') ?? '').trim()
+      : ''
+    const holidayEn = holidayEvt
+      ? stripNikud(holidayEvt.renderBrief?.('en') ?? holidayEvt.render('en') ?? '').trim()
+      : ''
+    const parashaHe = parashaEvt
+      ? stripNikud(parashaEvt.render?.('he') ?? '').trim()
+      : ''
+    const parashaEn = parashaEvt
+      ? stripNikud(parashaEvt.render?.('en') ?? '').trim()
+      : ''
+    const specialShabbatHe = specialShabbatEvt
+      ? stripNikud(specialShabbatEvt.render?.('he') ?? '').trim()
+      : ''
+    const specialShabbatEn = specialShabbatEvt
+      ? stripNikud(specialShabbatEvt.render?.('en') ?? '').trim()
+      : ''
+
+    // Templating key: holiday name takes priority; then 'shabbat' for plain Saturday.
+    let templateKey = ''
+    let defaultLabelHe = ''
+    let defaultLabelEn = ''
+    if (holidayHe) {
+      templateKey = holidayHe
+      defaultLabelHe = holidayHe
+      defaultLabelEn = holidayEn || holidayHe
+    } else if (dow === 6) {
+      templateKey = 'shabbat'
+      if (parashaHe && specialShabbatHe) {
+        defaultLabelHe = `${parashaHe} (${specialShabbatHe})`
+        defaultLabelEn = `${parashaEn} (${specialShabbatEn})`
+      } else {
+        defaultLabelHe = parashaHe || 'שבת'
+        defaultLabelEn = parashaEn || 'Shabbat'
+      }
+    }
+
+    cells.push({
+      dateStr,
+      hebrewDay: hd.getDate(),
+      hebrewDayLabel: dayToGematria(hd.getDate()),
+      inMonth,
+      dayOfWeek: dow,
+      isShabbat: dow === 6,
+      parashaHe,
+      parashaEn,
+      holidayHe,
+      holidayEn,
+      templateKey,
+      defaultLabelHe,
+      defaultLabelEn,
+      isToday: dateStr === todayStr,
+    })
+
+    cur.setDate(cur.getDate() + 1)
+  }
+
+  return cells
+}
+
 // Get Gregorian date range for an entire Hebrew year (Tishrei 1 → Elul end)
 export function hebrewYearToGregorianRange(hebrewYear: number): { start: string; end: string } {
   const startHd = new HDate(1, months.TISHREI, hebrewYear)

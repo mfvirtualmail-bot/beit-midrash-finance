@@ -1,120 +1,62 @@
 'use client'
-import { useEffect, useState, useRef, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useLang } from '@/lib/LangContext'
-import { Category, Member } from '@/lib/db'
+import { Member } from '@/lib/db'
 import { HDate } from '@hebcal/core'
-import { getMonthNameHe, getShabbatOrHolidayLabel, getHebrewMonthsInYear, hebrewMonthToGregorianRange, getHolidayPeriodsForMonth, applyLabelOverrides, LabelOverride } from '@/lib/hebrewDate'
-import { ShoppingCart, Plus, Trash2, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, Settings, Edit2, Calendar, Upload, Pencil, X } from 'lucide-react'
+import {
+  buildHebrewMonthGrid,
+  getHebrewMonthsInYear,
+  yearToGematriya,
+  applyLabelOverrides,
+  LabelOverride,
+} from '@/lib/hebrewDate'
+import {
+  ShoppingCart,
+  Plus,
+  Trash2,
+  CheckCircle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ListChecks,
+  Calendar as CalendarIcon,
+  Upload,
+  Pencil,
+  X,
+} from 'lucide-react'
 import Link from 'next/link'
+
+// === Types ===
 
 interface PurchaseRow {
   id: string
-  category_id: number | ''
+  item_label: string
   member_id: number | ''
   amount: string
   notes: string
 }
 
+interface TemplateItem { id?: number; label_he: string }
+interface PurchaseTemplate {
+  id: number
+  template_key: string
+  label_he: string
+  items: TemplateItem[]
+}
+
 function uuid() { return Math.random().toString(36).slice(2) }
-function newRow(): PurchaseRow {
-  return { id: uuid(), category_id: '', member_id: '', amount: '', notes: '' }
+function blankRow(): PurchaseRow {
+  return { id: uuid(), item_label: '', member_id: '', amount: '', notes: '' }
+}
+function rowFromTemplate(label: string): PurchaseRow {
+  return { id: uuid(), item_label: label, member_id: '', amount: '', notes: '' }
 }
 
-function getHebrewWeekStart(date: Date): Date {
-  const dow = date.getDay()
-  const sunday = new Date(date)
-  sunday.setDate(date.getDate() - dow)
-  return sunday
-}
+const HE_DAY_NAMES = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
+const EN_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-interface Period {
-  kind: 'week' | 'holiday'
-  label: string
-  dateStr: string
-  shabbatLabel: string     // Hebrew period label used in purchase description
-  shabbatLabelEn: string   // English period label
-}
-
-function formatGregISO(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function getPeriodsForMonth(hebrewMonth: number, hebrewYear: number, lang: 'he' | 'en' = 'he'): Period[] {
-  const range = hebrewMonthToGregorianRange(hebrewMonth, hebrewYear)
-  const startDate = new Date(range.start)
-  const endDate = new Date(range.end)
-  const firstSunday = getHebrewWeekStart(startDate)
-  const lastDate = new Date(endDate)
-  const lastSat = new Date(lastDate)
-  lastSat.setDate(lastDate.getDate() + (6 - lastDate.getDay()))
-
-  const periods: Period[] = []
-  const current = new Date(firstSunday)
-
-  // --- Weekly periods (Sunday → Saturday) ---
-  while (current <= lastSat) {
-    const sunday = new Date(current)
-    const saturday = new Date(sunday)
-    saturday.setDate(sunday.getDate() + 6)
-    const hdSun = new HDate(sunday)
-    const hdSat = new HDate(saturday)
-    const hebrewSunDay = hdSun.getDate()
-    const hebrewSunMonth = getMonthNameHe(hdSun.getMonth(), hdSun.getFullYear())
-    const hebrewSatDay = hdSat.getDate()
-    const hebrewSatMonth = getMonthNameHe(hdSat.getMonth(), hdSat.getFullYear())
-    const sameMonth = hdSun.getMonth() === hdSat.getMonth()
-    const hebrewLabel = sameMonth
-      ? `${hebrewSunDay}–${hebrewSatDay} ${hebrewSunMonth}`
-      : `${hebrewSunDay} ${hebrewSunMonth} – ${hebrewSatDay} ${hebrewSatMonth}`
-    const greg = `${sunday.toLocaleDateString('en-GB')} – ${saturday.toLocaleDateString('en-GB')}`
-    const sundayStr = formatGregISO(sunday)
-    const shabbatLabel = getShabbatOrHolidayLabel(sundayStr, 'he')
-    const shabbatLabelEn = getShabbatOrHolidayLabel(sundayStr, 'en')
-    periods.push({
-      kind: 'week',
-      label: `${shabbatLabel ? shabbatLabel + ' | ' : ''}${hebrewLabel}  (${greg})`,
-      dateStr: sundayStr,
-      shabbatLabel,
-      shabbatLabelEn,
-    })
-    current.setDate(current.getDate() + 7)
-  }
-
-  // --- Holiday periods (one entry per Yom Tov / chol hamoed / chanukah / etc. day) ---
-  const holidays = getHolidayPeriodsForMonth(hebrewMonth, hebrewYear)
-  for (const h of holidays) {
-    const [y, m, d] = h.dateStr.split('-').map(Number)
-    const jsDate = new Date(y, m - 1, d)
-    const hd = new HDate(jsDate)
-    const hebDay = hd.getDate()
-    const hebMonthName = getMonthNameHe(hd.getMonth(), hd.getFullYear())
-    const hebLabel = `${hebDay} ${hebMonthName}`
-    const greg = jsDate.toLocaleDateString('en-GB')
-    const name = lang === 'he' ? h.nameHe : h.nameEn
-    periods.push({
-      kind: 'holiday',
-      label: `🎉 ${name} | ${hebLabel}  (${greg})`,
-      dateStr: h.dateStr,
-      shabbatLabel: h.nameHe,
-      shabbatLabelEn: h.nameEn,
-    })
-  }
-
-  // Sort chronologically so weeks and holidays interleave correctly.
-  // Tie-break: weeks before holidays on the same day (a week starting Sunday
-  // and a holiday on that same Sunday are unlikely but the ordering is stable).
-  periods.sort((a, b) => {
-    if (a.dateStr !== b.dateStr) return a.dateStr.localeCompare(b.dateStr)
-    if (a.kind === b.kind) return 0
-    return a.kind === 'week' ? -1 : 1
-  })
-
-  return periods
-}
+// === Member dropdown (kept from previous version) ===
 
 function MemberSelect({ members, value, onChange, placeholder }: {
   members: Member[]
@@ -169,11 +111,14 @@ function MemberSelect({ members, value, onChange, placeholder }: {
   )
 }
 
+// === Page ===
+
 function PurchasesPageInner() {
   const { T, lang, isRTL } = useLang()
   const searchParams = useSearchParams()
-  const [categories, setCategories] = useState<Category[]>([])
   const [members, setMembers] = useState<Member[]>([])
+  const [templates, setTemplates] = useState<PurchaseTemplate[]>([])
+  const [labelOverrides, setLabelOverrides] = useState<LabelOverride[]>([])
 
   // Hebrew month navigation
   const todayHeb = new HDate(new Date())
@@ -182,106 +127,187 @@ function PurchasesPageInner() {
   const monthsInYear = getHebrewMonthsInYear(hebrewYear)
   const currentMonthInfo = monthsInYear.find(m => m.month === hebrewMonth)
 
-  const [labelOverrides, setLabelOverrides] = useState<LabelOverride[]>([])
-  useEffect(() => {
-    fetch('/api/labels').then(r => r.json()).then(d => Array.isArray(d) && setLabelOverrides(d)).catch(() => {})
-  }, [])
+  // Build the calendar grid for the current Hebrew month
+  const grid = useMemo(() => buildHebrewMonthGrid(hebrewMonth, hebrewYear), [hebrewMonth, hebrewYear])
 
-  const weeksRaw = getPeriodsForMonth(hebrewMonth, hebrewYear, lang as 'he' | 'en')
-  const weeks = labelOverrides.length > 0
-    ? weeksRaw.map(w => ({
-        ...w,
-        label: applyLabelOverrides(w.label, labelOverrides),
-        shabbatLabel: applyLabelOverrides(w.shabbatLabel, labelOverrides),
-        shabbatLabelEn: applyLabelOverrides(w.shabbatLabelEn, labelOverrides),
-      }))
-    : weeksRaw
-  // Each period has a unique id `${kind}|${dateStr}` so a holiday that falls on
-  // a week-Sunday can still be selected independently from that week.
-  const periodId = (p: Period) => `${p.kind}|${p.dateStr}`
-  const queryWeek = searchParams?.get('week')
-  // Accept either a bare YYYY-MM-DD (legacy ?week= links) or a composite id.
-  const initialWeek = (() => {
-    if (!queryWeek) return weeks[0] ? periodId(weeks[0]) : ''
-    if (queryWeek.includes('|')) return queryWeek
-    const match = weeks.find(w => w.dateStr === queryWeek)
-    return match ? periodId(match) : (weeks[0] ? periodId(weeks[0]) : '')
+  // Apply label overrides to parasha/holiday names
+  const gridWithOverrides = useMemo(() => {
+    if (labelOverrides.length === 0) return grid
+    return grid.map(c => ({
+      ...c,
+      parashaHe: applyLabelOverrides(c.parashaHe, labelOverrides),
+      holidayHe: applyLabelOverrides(c.holidayHe, labelOverrides),
+      defaultLabelHe: applyLabelOverrides(c.defaultLabelHe, labelOverrides),
+    }))
+  }, [grid, labelOverrides])
+
+  // Selected day
+  const queryDate = searchParams?.get('date') ?? ''
+  const initialDate = (() => {
+    if (queryDate && grid.some(c => c.dateStr === queryDate)) return queryDate
+    const today = grid.find(c => c.isToday && c.inMonth)
+    if (today) return today.dateStr
+    const first = grid.find(c => c.inMonth)
+    return first?.dateStr ?? ''
   })()
-  const [weekDate, setWeekDate] = useState(initialWeek)
+  const [selectedDate, setSelectedDate] = useState(initialDate)
 
-  const weekInList = weeks.find(w => periodId(w) === weekDate)
-  const effectivePeriodId = weekInList ? weekDate : (weeks[0] ? periodId(weeks[0]) : '')
-  const effectiveWeekDate = weekInList ? weekInList.dateStr : (weeks[0]?.dateStr ?? '')
-  const selectedWeek = weekInList ?? weeks[0]
-  const shabbatLabel = selectedWeek?.shabbatLabel ?? ''
-  const effectiveKind: 'week' | 'holiday' = selectedWeek?.kind ?? 'week'
+  const selectedCell = gridWithOverrides.find(c => c.dateStr === selectedDate) ?? null
+
+  // Editable label for the selected day. Resets when day changes (unless user typed).
+  const [labelEdit, setLabelEdit] = useState(selectedCell?.defaultLabelHe ?? '')
+  const [labelTouched, setLabelTouched] = useState(false)
+  useEffect(() => {
+    if (!labelTouched) {
+      setLabelEdit(selectedCell?.defaultLabelHe ?? '')
+    }
+  }, [selectedDate, selectedCell?.defaultLabelHe, labelTouched])
+
+  // Item rows for the selected day. Repopulated from template when day changes
+  // (unless the user has already started editing).
+  const [rows, setRows] = useState<PurchaseRow[]>([])
+  const [rowsTouched, setRowsTouched] = useState(false)
+
+  const matchedTemplate = useMemo(() => {
+    const key = selectedCell?.templateKey
+    if (!key) return null
+    const exact = templates.find(t => t.template_key === key)
+    if (exact) return exact
+    // Prefix match: a template "פסח" matches cell keys "פסח א'", "פסח ב'",
+    // "פסח ג' (חוה'מ)" etc. Longest prefix wins.
+    // Skip 'shabbat' (it's the explicit fallback key for plain Saturdays).
+    const prefix = templates
+      .filter(t => t.template_key && t.template_key !== 'shabbat' && key.startsWith(t.template_key))
+      .sort((a, b) => b.template_key.length - a.template_key.length)[0]
+    return prefix ?? null
+  }, [templates, selectedCell?.templateKey])
+
+  useEffect(() => {
+    if (rowsTouched) return
+    if (matchedTemplate && matchedTemplate.items.length > 0) {
+      setRows(matchedTemplate.items.map(it => rowFromTemplate(it.label_he)))
+    } else {
+      setRows([blankRow(), blankRow(), blankRow()])
+    }
+  }, [selectedDate, matchedTemplate, rowsTouched])
+
+  function selectDay(dateStr: string) {
+    setSelectedDate(dateStr)
+    setLabelTouched(false)
+    setRowsTouched(false)
+  }
 
   function navigateMonth(dir: -1 | 1) {
     const idx = monthsInYear.findIndex(m => m.month === hebrewMonth)
     const newIdx = idx + dir
+    let newMonth = hebrewMonth
+    let newYear = hebrewYear
     if (newIdx >= 0 && newIdx < monthsInYear.length) {
-      setHebrewMonth(monthsInYear[newIdx].month)
+      newMonth = monthsInYear[newIdx].month
     } else if (dir === 1) {
-      const nextYear = hebrewYear + 1
-      const nextMonths = getHebrewMonthsInYear(nextYear)
-      setHebrewYear(nextYear)
-      setHebrewMonth(nextMonths[0].month)
-    } else if (dir === -1) {
-      const prevYear = hebrewYear - 1
-      const prevMonths = getHebrewMonthsInYear(prevYear)
-      setHebrewYear(prevYear)
-      setHebrewMonth(prevMonths[prevMonths.length - 1].month)
+      newYear = hebrewYear + 1
+      newMonth = getHebrewMonthsInYear(newYear)[0].month
+    } else {
+      newYear = hebrewYear - 1
+      const prev = getHebrewMonthsInYear(newYear)
+      newMonth = prev[prev.length - 1].month
     }
+    setHebrewMonth(newMonth)
+    setHebrewYear(newYear)
+    // Move selection to first in-month day; reset edit state
+    setLabelTouched(false)
+    setRowsTouched(false)
   }
-  const [rows, setRows] = useState<PurchaseRow[]>([newRow(), newRow(), newRow()])
+
+  // Reload selected day when grid changes (after month nav)
+  useEffect(() => {
+    if (!gridWithOverrides.some(c => c.dateStr === selectedDate)) {
+      const first = gridWithOverrides.find(c => c.inMonth)
+      if (first) setSelectedDate(first.dateStr)
+    }
+  }, [gridWithOverrides, selectedDate])
+
+  // === Saving ===
   const [saving, setSaving] = useState(false)
   const [savedCount, setSavedCount] = useState<number | null>(null)
-  // Purchase types management modal
-  const [showTypesModal, setShowTypesModal] = useState(false)
-  const [typeForm, setTypeForm] = useState({ name_he: '' })
-  const [editingType, setEditingType] = useState<Category | null>(null)
-  const [savingType, setSavingType] = useState(false)
-  const [deleteTypeId, setDeleteTypeId] = useState<number | null>(null)
-  // Existing purchases for selected week
-  interface ExistingPurchase { id: number; amount: number; description_he: string; date: string; notes: string | null; member_id: number | null; member_name?: string; category_name_he?: string }
+
+  function updateRow(id: string, patch: Partial<PurchaseRow>) {
+    setRowsTouched(true)
+    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r))
+  }
+  function addRow() {
+    setRowsTouched(true)
+    setRows(prev => [...prev, blankRow()])
+  }
+  function removeRow(id: string) {
+    setRowsTouched(true)
+    setRows(prev => prev.filter(r => r.id !== id))
+  }
+
+  async function handleSave() {
+    if (!selectedDate) return
+    const periodLabel = (labelEdit || '').trim()
+    const valid = rows.filter(r => r.amount && Number(r.amount) > 0 && r.item_label.trim())
+    if (valid.length === 0) return
+    setSaving(true)
+    const txns = valid.map(r => {
+      const itemLabel = r.item_label.trim()
+      const descHe = periodLabel ? `${periodLabel} - ${itemLabel}` : itemLabel
+      const memberName = r.member_id ? (members.find(m => m.id === r.member_id)?.name ?? '') : ''
+      const notesStr = memberName
+        ? `${memberName}${r.notes ? ' - ' + r.notes : ''}`
+        : (r.notes || null)
+      return {
+        type: 'purchase',
+        amount: Number(r.amount),
+        description_he: descHe,
+        description_en: null,
+        category_id: null,
+        member_id: r.member_id || null,
+        date: selectedDate,
+        notes: notesStr,
+      }
+    })
+    await Promise.all(txns.map(tx =>
+      fetch('/api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tx) })
+    ))
+    setSaving(false)
+    setSavedCount(valid.length)
+    setRowsTouched(false)
+    // Re-trigger the prefill effect by toggling
+    setRows(matchedTemplate && matchedTemplate.items.length > 0
+      ? matchedTemplate.items.map(it => rowFromTemplate(it.label_he))
+      : [blankRow(), blankRow(), blankRow()])
+    setTimeout(() => setSavedCount(null), 4000)
+    loadExistingPurchases(selectedDate)
+  }
+
+  // === Existing purchases for selected day ===
+  interface ExistingPurchase {
+    id: number; amount: number; description_he: string; date: string;
+    notes: string | null; member_id: number | null; member_name?: string;
+  }
   const [existingPurchases, setExistingPurchases] = useState<ExistingPurchase[]>([])
-  const [loadingPurchases, setLoadingPurchases] = useState(false)
   const [editPurchase, setEditPurchase] = useState<ExistingPurchase | null>(null)
   const [editForm, setEditForm] = useState({ amount: '', notes: '' })
   const [deletePurchaseId, setDeletePurchaseId] = useState<number | null>(null)
   const [editSaving, setEditSaving] = useState(false)
 
-  async function loadExistingPurchases(weekStr: string, kind: 'week' | 'holiday') {
-    if (!weekStr) return
-    setLoadingPurchases(true)
+  async function loadExistingPurchases(date: string) {
+    if (!date) { setExistingPurchases([]); return }
     try {
-      let startStr = weekStr
-      let endStr = weekStr
-      if (kind === 'week') {
-        const [y, m, d] = weekStr.split('-').map(Number)
-        const sunday = new Date(y, m - 1, d)
-        const saturday = new Date(sunday)
-        saturday.setDate(sunday.getDate() + 6)
-        endStr = formatGregISO(saturday)
-      }
       const res = await fetch(`/api/transactions?type=purchase&limit=500`)
       const data = await res.json()
-      const periodPurchases = (data as ExistingPurchase[]).filter((tx: ExistingPurchase) =>
-        tx.date >= startStr && tx.date <= endStr && tx.member_id
-      )
-      setExistingPurchases(periodPurchases)
+      const dayPurchases = (data as ExistingPurchase[]).filter(tx => tx.date === date && tx.member_id)
+      setExistingPurchases(dayPurchases)
     } catch { setExistingPurchases([]) }
-    setLoadingPurchases(false)
   }
-
-  // Load existing purchases when the selected period changes
-  useEffect(() => { if (effectiveWeekDate) loadExistingPurchases(effectiveWeekDate, effectiveKind) }, [effectiveWeekDate, effectiveKind])
+  useEffect(() => { if (selectedDate) loadExistingPurchases(selectedDate) }, [selectedDate])
 
   function openEditPurchase(p: ExistingPurchase) {
     setEditPurchase(p)
     setEditForm({ amount: String(p.amount), notes: p.notes || '' })
   }
-
   async function handleEditPurchaseSave() {
     if (!editPurchase) return
     setEditSaving(true)
@@ -300,112 +326,48 @@ function PurchasesPageInner() {
     })
     setEditSaving(false)
     setEditPurchase(null)
-    loadExistingPurchases(effectiveWeekDate, effectiveKind)
+    loadExistingPurchases(selectedDate)
   }
-
   async function handleDeletePurchase(id: number) {
     await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
     setDeletePurchaseId(null)
-    loadExistingPurchases(effectiveWeekDate, effectiveKind)
+    loadExistingPurchases(selectedDate)
   }
 
-  async function loadCategories() {
-    const res = await fetch('/api/categories')
-    const data = await res.json()
-    setCategories(Array.isArray(data) ? data : [])
-  }
-
+  // === Initial loads ===
   useEffect(() => {
-    Promise.all([fetch('/api/categories'), fetch('/api/members')]).then(async ([c, m]) => {
-      setCategories(await c.json())
+    Promise.all([
+      fetch('/api/members'),
+      fetch('/api/purchase-templates'),
+      fetch('/api/labels'),
+    ]).then(async ([m, t, l]) => {
       setMembers(await m.json())
+      const tj = await t.json()
+      if (Array.isArray(tj)) setTemplates(tj)
+      const lj = await l.json().catch(() => [])
+      if (Array.isArray(lj)) setLabelOverrides(lj)
     })
   }, [])
 
-  function updateRow(id: string, field: keyof PurchaseRow, value: string | number | '') {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
-  }
-  function addRow() { setRows(prev => [...prev, newRow()]) }
-  function removeRow(id: string) { setRows(prev => prev.filter(r => r.id !== id)) }
-
-
-  async function handleSave() {
-    const valid = rows.filter(r => r.category_id && r.amount && Number(r.amount) > 0)
-    if (valid.length === 0) return
-    setSaving(true)
-    const txns = valid.map(r => {
-      const catName = purchaseCategories.find(c => c.id === r.category_id)?.name_he ?? ''
-      const descHe = shabbatLabel ? `${shabbatLabel} - ${catName}` : catName
-      const memberName = r.member_id ? (members.find(m => m.id === r.member_id)?.name ?? '') : ''
-      const notesStr = memberName
-        ? `${memberName}${r.notes ? ' - ' + r.notes : ''}`
-        : r.notes || null
-      return {
-        type: 'purchase',
-        amount: Number(r.amount),
-        description_he: descHe,
-        description_en: null,
-        category_id: r.category_id || null,
-        member_id: r.member_id || null,
-        date: effectiveWeekDate,
-        notes: notesStr,
-      }
-    })
-    await Promise.all(txns.map(tx =>
-      fetch('/api/transactions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tx) })
-    ))
-    setSaving(false)
-    setSavedCount(valid.length)
-    setRows([newRow(), newRow(), newRow()])
-    setTimeout(() => setSavedCount(null), 4000)
-    loadExistingPurchases(effectiveWeekDate, effectiveKind)
-  }
-
-  function openAddType() {
-    setEditingType(null)
-    setTypeForm({ name_he: '' })
-  }
-
-  function openEditType(cat: Category) {
-    setEditingType(cat)
-    setTypeForm({ name_he: cat.name_he })
-  }
-
-  async function handleSaveType(e: React.FormEvent) {
-    e.preventDefault()
-    if (!typeForm.name_he.trim()) return
-    setSavingType(true)
-    const url = editingType ? `/api/categories/${editingType.id}` : '/api/categories'
-    const method = editingType ? 'PUT' : 'POST'
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name_he: typeForm.name_he, name_en: typeForm.name_he, type: 'purchase', color: '#6b7280' }),
-    })
-    setSavingType(false)
-    setEditingType(null)
-    setTypeForm({ name_he: '' })
-    loadCategories()
-  }
-
-  async function handleDeleteType(id: number) {
-    await fetch(`/api/categories/${id}`, { method: 'DELETE' })
-    setDeleteTypeId(null)
-    loadCategories()
-  }
-
-  const purchaseCategories = categories.filter(c => c.type === 'purchase')
   const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
   const fmt = (n: number) => new Intl.NumberFormat(lang === 'he' ? 'he-IL' : 'en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+  const dayNames = lang === 'he' ? HE_DAY_NAMES : EN_DAY_NAMES
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <ShoppingCart size={24} className="text-orange-500" />
-          {lang === 'he' ? 'הזנת רכישות שבועיות' : 'Weekly Purchases Entry'}
+          {lang === 'he' ? 'הזנת רכישות' : 'Purchases Entry'}
         </h1>
         <div className="flex gap-2 flex-wrap">
+          <Link
+            href="/settings/purchase-templates"
+            className="flex items-center gap-2 text-sm px-3 py-2 bg-orange-50 border border-orange-300 text-orange-800 hover:bg-orange-100 rounded-xl font-medium transition-colors"
+          >
+            <ListChecks size={15} />
+            {lang === 'he' ? 'תבניות פריטים' : 'Item Templates'}
+          </Link>
           <Link
             href="/purchases/import"
             className="flex items-center gap-2 text-sm px-3 py-2 bg-green-50 border border-green-300 text-green-800 hover:bg-green-100 rounded-xl font-medium transition-colors"
@@ -413,13 +375,6 @@ function PurchasesPageInner() {
             <Upload size={15} />
             {lang === 'he' ? 'ייבוא מ-Excel' : 'Import from Excel'}
           </Link>
-          <button
-            onClick={() => setShowTypesModal(true)}
-            className="flex items-center gap-2 text-sm px-3 py-2 bg-orange-50 border border-orange-300 text-orange-800 hover:bg-orange-100 rounded-xl font-medium transition-colors"
-          >
-            <Settings size={15} />
-            {lang === 'he' ? 'נהל סוגי רכישות' : 'Manage Purchase Types'}
-          </button>
         </div>
       </div>
 
@@ -430,128 +385,208 @@ function PurchasesPageInner() {
         </div>
       )}
 
+      {/* Hebrew month calendar */}
       <div className="card">
-        <div className="mb-6 space-y-4">
-          {/* Hebrew month navigation */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-            <button onClick={() => navigateMonth(isRTL ? 1 : -1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-              <ChevronLeft size={18} />
-            </button>
-            <div className="text-center">
-              <span className="font-bold text-gray-900">
-                {lang === 'he' ? currentMonthInfo?.nameHe : currentMonthInfo?.nameEn}
-              </span>
-              <span className="text-sm text-gray-500 mx-2">{hebrewYear}</span>
-            </div>
-            <button onClick={() => navigateMonth(isRTL ? -1 : 1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-              <ChevronRight size={18} />
-            </button>
-          </div>
-
-          <div>
-            <label className="label text-base font-semibold">
-              {lang === 'he' ? 'בחר שבוע / חג' : 'Select Week / Holiday'}
-            </label>
-            <select className="input w-full max-w-xl text-sm" dir="rtl" value={effectivePeriodId} onChange={e => setWeekDate(e.target.value)}>
-              {weeks.map(w => (
-                <option key={periodId(w)} value={periodId(w)}>{w.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {selectedWeek?.shabbatLabel && (
-            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm font-medium" dir="rtl">
-              <Calendar size={14} />
-              {lang === 'he' ? selectedWeek.shabbatLabel : selectedWeek.shabbatLabelEn}
-            </div>
-          )}
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[220px]">
-                  {lang === 'he' ? 'פריט' : 'Item'}
-                </th>
-                <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[200px]">
-                  {T.member}
-                </th>
-                <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[130px]">
-                  {T.amount} (€)
-                </th>
-                <th className="text-start py-2 px-2 font-semibold text-gray-600">
-                  {T.notes}
-                </th>
-                <th className="w-8"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(row => (
-                <tr key={row.id} className="border-b border-gray-50">
-                  <td className="py-2 px-2">
-                    <select className="input w-full text-sm" dir={isRTL ? 'rtl' : 'ltr'}
-                      value={row.category_id}
-                      onChange={e => updateRow(row.id, 'category_id', e.target.value ? Number(e.target.value) : '')}>
-                      <option value="">{lang === 'he' ? '— בחר פריט —' : '— Select item —'}</option>
-                      {purchaseCategories.map(c => (
-                        <option key={c.id} value={c.id}>{c.name_he}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="py-2 px-2">
-                    <MemberSelect
-                      members={members}
-                      value={row.member_id}
-                      onChange={v => updateRow(row.id, 'member_id', v)}
-                      placeholder={lang === 'he' ? '— ללא חבר —' : '— No member —'}
-                    />
-                  </td>
-                  <td className="py-2 px-2">
-                    <input type="number" className="input w-full text-sm" min="0" step="0.01"
-                      value={row.amount}
-                      onChange={e => updateRow(row.id, 'amount', e.target.value)}
-                      placeholder="0.00" />
-                  </td>
-                  <td className="py-2 px-2">
-                    <input className="input w-full text-sm" value={row.notes}
-                      onChange={e => updateRow(row.id, 'notes', e.target.value)}
-                      placeholder={T.notes} />
-                  </td>
-                  <td className="py-2 px-2">
-                    <button type="button" onClick={() => removeRow(row.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
-          <button type="button" onClick={addRow} className="btn-secondary flex items-center gap-2 text-sm">
-            <Plus size={14} /> {lang === 'he' ? 'הוסף שורה' : 'Add Row'}
+        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 mb-4">
+          <button onClick={() => navigateMonth(isRTL ? 1 : -1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+            <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-6">
-            {total > 0 && (
-              <div className="text-sm font-semibold text-gray-700">
-                {T.total}: <span className="text-orange-600">{fmt(total)}</span>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || rows.every(r => !r.category_id || !r.amount)}
-              className="btn-primary flex items-center gap-2">
-              <CheckCircle size={16} />
-              {saving ? T.loading : (lang === 'he' ? 'שמור הכל' : 'Save All')}
-            </button>
+          <div className="text-center" dir="rtl">
+            <span className="font-bold text-gray-900 text-lg">
+              {currentMonthInfo?.nameHe}
+            </span>
+            <span className="text-base text-gray-500 mx-2">{yearToGematriya(hebrewYear)}</span>
           </div>
+          <button onClick={() => navigateMonth(isRTL ? -1 : 1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7 gap-1 text-xs" dir="rtl">
+          {dayNames.map((n, i) => (
+            <div key={i} className="text-center font-bold text-gray-500 py-1">{n}</div>
+          ))}
+          {gridWithOverrides.map(cell => {
+            const isSelected = cell.dateStr === selectedDate
+            const isHoliday = !!cell.holidayHe
+            const baseBg =
+              !cell.inMonth ? 'bg-gray-50 text-gray-300'
+              : isSelected ? 'bg-orange-500 text-white border-orange-600 shadow-md'
+              : isHoliday ? 'bg-purple-50 hover:bg-purple-100'
+              : cell.isShabbat ? 'bg-blue-50 hover:bg-blue-100'
+              : cell.isToday ? 'bg-yellow-50 hover:bg-yellow-100'
+              : 'bg-white hover:bg-gray-50'
+            return (
+              <button
+                key={cell.dateStr}
+                type="button"
+                onClick={() => selectDay(cell.dateStr)}
+                className={`text-start rounded-lg border ${isSelected ? '' : 'border-gray-100'} p-1.5 min-h-[64px] flex flex-col gap-0.5 transition-colors ${baseBg}`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className={`font-bold text-sm ${isSelected ? 'text-white' : (cell.inMonth ? 'text-gray-800' : 'text-gray-300')}`}>
+                    {cell.hebrewDayLabel}
+                  </span>
+                  {cell.isToday && cell.inMonth && (
+                    <span className={`text-[9px] px-1 rounded ${isSelected ? 'bg-white/30' : 'bg-yellow-200 text-yellow-800'}`}>
+                      {lang === 'he' ? 'היום' : 'today'}
+                    </span>
+                  )}
+                </div>
+                {(cell.holidayHe || cell.parashaHe) && (
+                  <div className={`text-[10px] leading-tight truncate ${isSelected ? 'text-white' : (isHoliday ? 'text-purple-700 font-semibold' : 'text-blue-700')}`}>
+                    {cell.holidayHe || cell.parashaHe}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="text-xs text-gray-400 mt-3 flex items-center gap-3 flex-wrap" dir={isRTL ? 'rtl' : 'ltr'}>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
+            {lang === 'he' ? 'שבת' : 'Shabbat'}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-3 h-3 rounded bg-purple-100 border border-purple-200" />
+            {lang === 'he' ? 'חג / מועד' : 'Holiday'}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-200" />
+            {lang === 'he' ? 'היום' : 'Today'}
+          </span>
         </div>
       </div>
 
-      {/* Existing Purchases for Selected Week */}
+      {/* Day editor */}
+      {selectedCell && (
+        <div className="card">
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm text-gray-500" dir="rtl">
+              <CalendarIcon size={14} />
+              <span>{selectedCell.hebrewDayLabel} {currentMonthInfo?.nameHe} {yearToGematriya(hebrewYear)}</span>
+              <span className="text-gray-300">·</span>
+              <span>{new Date(selectedCell.dateStr).toLocaleDateString(lang === 'he' ? 'he-IL' : 'en-GB')}</span>
+            </div>
+            <div>
+              <label className="label text-sm font-semibold">
+                {lang === 'he' ? 'שם התקופה / היום (ניתן לעריכה)' : 'Period / Day Label (editable)'}
+              </label>
+              <input
+                dir="rtl"
+                className="input w-full max-w-xl text-base"
+                value={labelEdit}
+                onChange={e => { setLabelEdit(e.target.value); setLabelTouched(true) }}
+                placeholder={lang === 'he' ? 'הקלד שם תקופה...' : 'Type a period name...'}
+              />
+            </div>
+            {matchedTemplate && (
+              <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-800 px-3 py-1.5 rounded-lg text-xs">
+                <ListChecks size={12} />
+                {lang === 'he'
+                  ? `תבנית: ${matchedTemplate.label_he} (${matchedTemplate.items.length} פריטים)`
+                  : `Template: ${matchedTemplate.label_he} (${matchedTemplate.items.length} items)`}
+              </div>
+            )}
+            {!matchedTemplate && (selectedCell.isShabbat || selectedCell.holidayHe) && (
+              <div className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs">
+                {lang === 'he'
+                  ? `אין תבנית עבור ${selectedCell.holidayHe || 'שבת'}.`
+                  : `No template for ${selectedCell.holidayEn || 'Shabbat'}.`}
+                <Link href="/settings/purchase-templates" className="underline">
+                  {lang === 'he' ? 'צור תבנית' : 'Create one'}
+                </Link>
+              </div>
+            )}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[260px]">
+                    {lang === 'he' ? 'פריט' : 'Item'}
+                  </th>
+                  <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[200px]">
+                    {T.member}
+                  </th>
+                  <th className="text-start py-2 px-2 font-semibold text-gray-600 w-[130px]">
+                    {T.amount} (€)
+                  </th>
+                  <th className="text-start py-2 px-2 font-semibold text-gray-600">
+                    {T.notes}
+                  </th>
+                  <th className="w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(row => (
+                  <tr key={row.id} className="border-b border-gray-50">
+                    <td className="py-2 px-2">
+                      <input
+                        dir="rtl"
+                        className="input w-full text-sm"
+                        value={row.item_label}
+                        onChange={e => updateRow(row.id, { item_label: e.target.value })}
+                        placeholder={lang === 'he' ? 'שם הפריט' : 'Item name'}
+                      />
+                    </td>
+                    <td className="py-2 px-2">
+                      <MemberSelect
+                        members={members}
+                        value={row.member_id}
+                        onChange={v => updateRow(row.id, { member_id: v })}
+                        placeholder={lang === 'he' ? '— ללא חבר —' : '— No member —'}
+                      />
+                    </td>
+                    <td className="py-2 px-2">
+                      <input type="number" className="input w-full text-sm" min="0" step="0.01"
+                        value={row.amount}
+                        onChange={e => updateRow(row.id, { amount: e.target.value })}
+                        placeholder="0.00" />
+                    </td>
+                    <td className="py-2 px-2">
+                      <input className="input w-full text-sm" value={row.notes}
+                        onChange={e => updateRow(row.id, { notes: e.target.value })}
+                        placeholder={T.notes} />
+                    </td>
+                    <td className="py-2 px-2">
+                      <button type="button" onClick={() => removeRow(row.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+            <button type="button" onClick={addRow} className="btn-secondary flex items-center gap-2 text-sm">
+              <Plus size={14} /> {lang === 'he' ? 'הוסף שורה' : 'Add Row'}
+            </button>
+            <div className="flex items-center gap-6">
+              {total > 0 && (
+                <div className="text-sm font-semibold text-gray-700">
+                  {T.total}: <span className="text-orange-600">{fmt(total)}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || rows.every(r => !r.amount || !r.item_label.trim())}
+                className="btn-primary flex items-center gap-2">
+                <CheckCircle size={16} />
+                {saving ? T.loading : (lang === 'he' ? 'שמור הכל' : 'Save All')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing purchases for selected day */}
       {existingPurchases.length > 0 && (
         <div className="card">
           <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -573,7 +608,7 @@ function PurchasesPageInner() {
                 {existingPurchases.map(p => {
                   const desc = p.description_he || ''
                   const dashIdx = desc.indexOf(' - ')
-                  const itemName = dashIdx > 0 ? desc.substring(dashIdx + 3) : (p.category_name_he || desc)
+                  const itemName = dashIdx > 0 ? desc.substring(dashIdx + 3) : desc
                   const memberName = p.notes?.split(' - ')[0] || (members.find(m => m.id === p.member_id)?.name) || '—'
                   return (
                     <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
@@ -646,78 +681,6 @@ function PurchasesPageInner() {
             <div className="flex gap-2">
               <button onClick={() => handleDeletePurchase(deletePurchaseId)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex-1">{T.delete}</button>
               <button onClick={() => setDeletePurchaseId(null)} className="btn-secondary flex-1">{T.cancel}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Purchase Types Management Modal */}
-      {showTypesModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Settings size={18} className="text-orange-500" />
-                {lang === 'he' ? 'ניהול סוגי רכישות' : 'Manage Purchase Types'}
-              </h2>
-              <button onClick={() => { setShowTypesModal(false); setEditingType(null); setTypeForm({ name_he: '' }) }}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">✕</button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* Add / Edit form */}
-              <form onSubmit={handleSaveType} className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
-                <div className="text-sm font-semibold text-orange-800">
-                  {editingType ? (lang === 'he' ? 'ערוך סוג' : 'Edit Type') : (lang === 'he' ? 'הוסף סוג חדש' : 'Add New Type')}
-                </div>
-                <div>
-                  <label className="label text-xs">{lang === 'he' ? 'שם בעברית *' : 'Hebrew Name *'}</label>
-                  <input dir="rtl" className="input w-full text-sm" required
-                    value={typeForm.name_he} onChange={e => setTypeForm(f => ({ ...f, name_he: e.target.value }))} />
-                </div>
-                <div className="flex gap-2">
-                  <button type="submit" disabled={savingType} className="btn-primary text-sm flex-1">
-                    {savingType ? T.loading : (editingType ? T.save : T.add)}
-                  </button>
-                  {editingType && (
-                    <button type="button" onClick={() => { setEditingType(null); setTypeForm({ name_he: '' }) }}
-                      className="btn-secondary text-sm px-3">{T.cancel}</button>
-                  )}
-                </div>
-              </form>
-
-              {/* Types list */}
-              <div className="space-y-1">
-                {purchaseCategories.length === 0 && (
-                  <p className="text-center text-gray-400 py-4 text-sm">{lang === 'he' ? 'אין סוגי רכישות' : 'No purchase types'}</p>
-                )}
-                {purchaseCategories.map(cat => (
-                  <div key={cat.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 group">
-                    <span className="font-medium text-gray-800 flex-1" dir="rtl">{cat.name_he}</span>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openEditType(cat)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded">
-                        <Edit2 size={13} />
-                      </button>
-                      <button onClick={() => setDeleteTypeId(cat.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete type confirm */}
-      {deleteTypeId !== null && (
-        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center space-y-4">
-            <p className="font-medium text-gray-800">{T.confirmDelete}</p>
-            <div className="flex gap-2">
-              <button onClick={() => handleDeleteType(deleteTypeId)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex-1">{T.delete}</button>
-              <button onClick={() => setDeleteTypeId(null)} className="btn-secondary flex-1">{T.cancel}</button>
             </div>
           </div>
         </div>
