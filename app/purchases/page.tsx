@@ -385,34 +385,35 @@ function PurchasesPageInner() {
         </div>
       )}
 
-      {/* Hebrew month calendar */}
-      <div className="card">
-        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 mb-4">
-          <button onClick={() => navigateMonth(isRTL ? 1 : -1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-            <ChevronLeft size={18} />
+      {/* Hebrew month calendar — compact */}
+      <div className="card !p-3">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <button onClick={() => navigateMonth(isRTL ? 1 : -1)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <ChevronLeft size={16} />
           </button>
           <div className="text-center" dir="rtl">
-            <span className="font-bold text-gray-900 text-lg">
+            <span className="font-bold text-gray-900 text-sm">
               {currentMonthInfo?.nameHe}
             </span>
-            <span className="text-base text-gray-500 mx-2">{yearToGematriya(hebrewYear)}</span>
+            <span className="text-xs text-gray-500 mx-1.5">{yearToGematriya(hebrewYear)}</span>
           </div>
-          <button onClick={() => navigateMonth(isRTL ? -1 : 1)} className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors">
-            <ChevronRight size={18} />
+          <button onClick={() => navigateMonth(isRTL ? -1 : 1)} className="p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <ChevronRight size={16} />
           </button>
         </div>
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-1 text-xs" dir="rtl">
+        {/* Calendar grid — compact, day cells ~36px tall */}
+        <div className="grid grid-cols-7 gap-0.5" dir="rtl">
           {dayNames.map((n, i) => (
-            <div key={i} className="text-center font-bold text-gray-500 py-1">{n}</div>
+            <div key={i} className="text-center font-bold text-gray-400 text-[10px] pb-0.5">{n}</div>
           ))}
           {gridWithOverrides.map(cell => {
             const isSelected = cell.dateStr === selectedDate
             const isHoliday = !!cell.holidayHe
+            const label = cell.holidayHe || cell.parashaHe
             const baseBg =
               !cell.inMonth ? 'bg-gray-50 text-gray-300'
-              : isSelected ? 'bg-orange-500 text-white border-orange-600 shadow-md'
+              : isSelected ? 'bg-orange-500 text-white border-orange-600'
               : isHoliday ? 'bg-purple-50 hover:bg-purple-100'
               : cell.isShabbat ? 'bg-blue-50 hover:bg-blue-100'
               : cell.isToday ? 'bg-yellow-50 hover:bg-yellow-100'
@@ -422,41 +423,27 @@ function PurchasesPageInner() {
                 key={cell.dateStr}
                 type="button"
                 onClick={() => selectDay(cell.dateStr)}
-                className={`text-start rounded-lg border ${isSelected ? '' : 'border-gray-100'} p-1.5 min-h-[64px] flex flex-col gap-0.5 transition-colors ${baseBg}`}
+                title={label}
+                className={`text-start rounded-md border ${isSelected ? '' : 'border-gray-100'} px-1 py-0.5 h-9 flex flex-col justify-center gap-0 transition-colors leading-none ${baseBg}`}
               >
-                <div className="flex items-center justify-between gap-1">
-                  <span className={`font-bold text-sm ${isSelected ? 'text-white' : (cell.inMonth ? 'text-gray-800' : 'text-gray-300')}`}>
+                <div className="flex items-center justify-between gap-0.5">
+                  <span className={`font-bold text-xs ${isSelected ? 'text-white' : (cell.inMonth ? 'text-gray-800' : 'text-gray-300')}`}>
                     {cell.hebrewDayLabel}
                   </span>
                   {cell.isToday && cell.inMonth && (
-                    <span className={`text-[9px] px-1 rounded ${isSelected ? 'bg-white/30' : 'bg-yellow-200 text-yellow-800'}`}>
-                      {lang === 'he' ? 'היום' : 'today'}
+                    <span className={`text-[8px] px-0.5 rounded ${isSelected ? 'bg-white/30' : 'bg-yellow-200 text-yellow-800'}`}>
+                      {lang === 'he' ? 'היום' : '·'}
                     </span>
                   )}
                 </div>
-                {(cell.holidayHe || cell.parashaHe) && (
-                  <div className={`text-[10px] leading-tight truncate ${isSelected ? 'text-white' : (isHoliday ? 'text-purple-700 font-semibold' : 'text-blue-700')}`}>
-                    {cell.holidayHe || cell.parashaHe}
+                {label && (
+                  <div className={`text-[9px] leading-tight truncate ${isSelected ? 'text-white/90' : (isHoliday ? 'text-purple-700' : 'text-blue-700')}`}>
+                    {label}
                   </div>
                 )}
               </button>
             )
           })}
-        </div>
-
-        <div className="text-xs text-gray-400 mt-3 flex items-center gap-3 flex-wrap" dir={isRTL ? 'rtl' : 'ltr'}>
-          <span className="inline-flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
-            {lang === 'he' ? 'שבת' : 'Shabbat'}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-purple-100 border border-purple-200" />
-            {lang === 'he' ? 'חג / מועד' : 'Holiday'}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-200" />
-            {lang === 'he' ? 'היום' : 'Today'}
-          </span>
         </div>
       </div>
 
