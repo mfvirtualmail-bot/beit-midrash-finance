@@ -67,6 +67,12 @@ function StatementsPage() {
   const [emailTemplates, setEmailTemplates] = useState<Array<{ id: number; name: string; is_default: boolean }>>([])
   const [pendingEmailMember, setPendingEmailMember] = useState<number | null>(null)
 
+  // Bulk-email-all state
+  const [showBulkEmail, setShowBulkEmail] = useState(false)
+  const [bulkEmailTo, setBulkEmailTo] = useState('')
+  const [bulkEmailSending, setBulkEmailSending] = useState(false)
+  const [bulkEmailDefault, setBulkEmailDefault] = useState('')
+
   const fmt = (n: number) => `€${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   async function load() {
@@ -83,6 +89,14 @@ function StatementsPage() {
   useEffect(() => {
     fetch('/api/email-templates').then(r => r.json()).then(data => {
       if (Array.isArray(data)) setEmailTemplates(data)
+    }).catch(() => {})
+  }, [])
+
+  // Default recipient for "Email all statements" — pre-fill from org_email if set
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(data => {
+      const def = (data && (data.org_email || data.gmail_user)) || ''
+      if (def) setBulkEmailDefault(def)
     }).catch(() => {})
   }, [])
 
@@ -235,6 +249,37 @@ function StatementsPage() {
     sendStatementEmailWithTemplate(memberId, defaultTpl?.id ?? null)
   }
 
+  function openBulkEmailModal() {
+    setBulkEmailTo(bulkEmailDefault)
+    setShowBulkEmail(true)
+  }
+
+  async function sendAllStatements() {
+    const to = bulkEmailTo.trim()
+    if (!to) return
+    setBulkEmailSending(true)
+    setEmailMsg(null)
+    try {
+      const range = hebrewYearToGregorianRange(selectedYear)
+      const res = await fetch('/api/email/send-bulk-statements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, date_from: range.start, date_to: range.end }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setEmailMsg({ type: 'ok', text: he ? `נשלחו דפי חשבון של ${data.count} חברים אל ${to}` : `Sent ${data.count} statements to ${to}` })
+        setShowBulkEmail(false)
+      } else {
+        setEmailMsg({ type: 'err', text: data.error || (he ? 'שגיאה בשליחה' : 'Failed to send') })
+      }
+    } catch {
+      setEmailMsg({ type: 'err', text: he ? 'שגיאת רשת' : 'Network error' })
+    }
+    setBulkEmailSending(false)
+    setTimeout(() => setEmailMsg(null), 8000)
+  }
+
   async function sendStatementEmailWithTemplate(memberId: number, templateId: number | null) {
     setPendingEmailMember(null)
     setSendingEmail(memberId)
@@ -307,11 +352,71 @@ function StatementsPage() {
         </div>
       )}
 
+      {/* Bulk-email-all modal */}
+      {showBulkEmail && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !bulkEmailSending && setShowBulkEmail(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Mail size={18} className="text-blue-600" />
+                {he ? 'שליחת כל דפי החשבון' : 'Email all statements'}
+              </h2>
+              <button onClick={() => setShowBulkEmail(false)} disabled={bulkEmailSending} className="p-1 hover:bg-gray-100 rounded disabled:opacity-50">
+                <X size={18} className="text-gray-400" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              {he
+                ? `דפי החשבון של כל החברים הפעילים לשנה ${selectedYear} יישלחו כקובץ PDF מצורף.`
+                : `Statements for all active members for year ${selectedYear} will be sent as one attached PDF.`}
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {he ? 'שלח אל' : 'Send to'}
+              </label>
+              <input
+                type="email"
+                className="input w-full"
+                value={bulkEmailTo}
+                onChange={e => setBulkEmailTo(e.target.value)}
+                placeholder="name@example.com"
+                disabled={bulkEmailSending}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowBulkEmail(false)}
+                disabled={bulkEmailSending}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+              >
+                {T.cancel}
+              </button>
+              <button
+                onClick={sendAllStatements}
+                disabled={bulkEmailSending || !bulkEmailTo.trim()}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50"
+              >
+                {bulkEmailSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {bulkEmailSending ? (he ? 'שולח...' : 'Sending...') : (he ? 'שלח' : 'Send')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <FileText size={24} className="text-blue-600" /> {he ? 'דפי חשבון' : 'Statements'}
         </h1>
+        <button
+          onClick={openBulkEmailModal}
+          className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm"
+        >
+          <Mail size={16} />
+          {he ? 'שלח את כל דפי החשבון' : 'Email all statements'}
+        </button>
       </div>
 
       {/* PDF generating indicator */}
