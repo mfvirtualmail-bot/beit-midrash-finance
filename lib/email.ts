@@ -218,6 +218,60 @@ export async function sendStatementEmail(
   })
 }
 
+// ==================== BULK STATEMENTS EMAIL ====================
+
+export async function sendBulkStatementsEmail(
+  to: string,
+  pdfBuffer: Buffer,
+  pdfFileName: string,
+  memberCount: number,
+  dateFrom?: string | null,
+  dateTo?: string | null,
+) {
+  const emailSettings = await getEmailSettings()
+  const transporter = createTransport(emailSettings.gmailUser, emailSettings.gmailAppPassword)
+
+  const todayStr = new Date().toLocaleDateString('he-IL')
+  const rangeLine = dateFrom && dateTo
+    ? `<p style="font-size:13px;color:#475569;margin:0 0 8px;">תקופה: ${dateFrom} – ${dateTo}</p>`
+    : ''
+
+  const html = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif;direction:rtl;background:#f8fafc;">
+  <div style="max-width:560px;margin:0 auto;padding:24px;">
+    <div style="background:linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%);color:white;padding:24px;border-radius:12px 12px 0 0;text-align:center;">
+      <h1 style="margin:0;font-size:22px;font-weight:800;">${emailSettings.orgName}</h1>
+      <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.8);">דפי חשבון - כל החברים</p>
+    </div>
+    <div style="background:white;padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+      <p style="font-size:15px;color:#1e293b;margin:0 0 12px;">שלום,</p>
+      <p style="font-size:14px;color:#475569;margin:0 0 16px;">
+        מצורף קובץ PDF המכיל את דפי החשבון של <strong>${memberCount}</strong> חברים פעילים.
+      </p>
+      ${rangeLine}
+      <p style="font-size:12px;color:#94a3b8;margin:16px 0 0;">הופק בתאריך ${todayStr}</p>
+    </div>
+  </div>
+</body>
+</html>`
+
+  await transporter.sendMail({
+    from: `"${emailSettings.senderName}" <${emailSettings.gmailUser}>`,
+    to,
+    subject: `דפי חשבון - כל החברים (${memberCount}) - ${emailSettings.orgName}`,
+    html,
+    attachments: [
+      {
+        filename: pdfFileName,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ],
+  })
+}
+
 // ==================== PAYMENT CONFIRMATION EMAIL ====================
 
 const METHOD_LABELS_HE: Record<string, string> = {

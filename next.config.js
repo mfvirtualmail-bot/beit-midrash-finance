@@ -11,6 +11,7 @@ const nextConfig = {
       '/api/statements/pdf': ['./fonts/**/*', './public/logo.png'],
       '/api/members/collection-pdf': ['./fonts/**/*', './public/logo.png'],
       '/api/email/send-statement': ['./fonts/**/*', './public/logo.png'],
+      '/api/email/send-bulk-statements': ['./fonts/**/*', './public/logo.png'],
     },
   },
 }
